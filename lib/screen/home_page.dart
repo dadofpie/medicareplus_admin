@@ -114,14 +114,12 @@ class _HomePageState extends State<HomePage> {
       if (pageIndex == 0) {
         currentPage = const OverviewPage();
       } else if (pageIndex == 1) {
-        currentPage = const HealthCardPage();
-      } else if (pageIndex == 2) {
         currentPage = const UserManagementPage();
       } else {
         // Prevent navigation to restricted pages for UPD admin
         return;
       }
-    } else if (adminType == 'claims') {
+    } else if (adminType == 'claims' || adminType == 'concierge') {
       // Claims can access all except Admin (index 6)
       if (pageIndex == 0) {
         currentPage = const OverviewPage();
@@ -171,8 +169,8 @@ class _HomePageState extends State<HomePage> {
 
   int getCardListLength(String adminType) {
     if (adminType == 'upd') {
-      return 3;  // 'UPD' admin can see 3 cards
-    } else if (adminType == 'claims') {
+      return 2;  // 'UPD' admin can see 3 cards
+    } else if (adminType == 'claims' || adminType == 'concierge') {
       return 6;  // 'Claims' admin can see 6 cards
     } else {
       return 7;  // Default case, other admin types can see all 7 cards
@@ -263,7 +261,6 @@ class _HomePageState extends State<HomePage> {
                               // UPD admin type can only see these titles
                               cardTitles = [
                                 'Overview',
-                                'Health Card',
                                 'Customer',
                               ];
                             } else if (authState.adminType.toString() == 'claims') {

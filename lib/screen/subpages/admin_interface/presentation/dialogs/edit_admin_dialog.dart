@@ -226,9 +226,7 @@ class _EditAdminDialogState extends State<EditAdminDialog> {
                                   return 'Email address is required';
                                 } else if (value.length < 6) {
                                   return 'Email address must be at least 6 characters long';
-                                } else if (!value.endsWith('.com')) {
-                                  return 'Email address must end with ".com"';
-                                } else if (!regExp.hasMatch(value)) {
+                                }  else if (!regExp.hasMatch(value)) {
                                   return 'Please input a valid email';
                                 } 
                               return null;

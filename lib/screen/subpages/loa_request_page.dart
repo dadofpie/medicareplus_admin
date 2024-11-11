@@ -1341,10 +1341,12 @@ Future<void> _releasedRequest(String lockedBy, String requestId) async {
                                                     AuthState>(
                                                   builder: (context, state) {
                                                     if (state is AuthSuccess) {
-                                                      if (state.adminType ==
-                                                          'admin') {
+                                                       
                                                         return Row(
                                                           children: [
+                                                          if (state.adminType ==
+                                                          'admin' || state.adminType ==
+                                                          'concierge')
                                                             IconButton(
                                                               icon: const Icon(
                                                                   Icons.check),
@@ -1370,6 +1372,9 @@ Future<void> _releasedRequest(String lockedBy, String requestId) async {
                                                                       }
                                                                     },
                                                             ),
+                                                            if (state.adminType ==
+                                                          'admin' || state.adminType ==
+                                                          'concierge')
                                                             IconButton(
                                                               icon: const Icon(
                                                                   Icons.close),
@@ -1537,6 +1542,9 @@ Future<void> _releasedRequest(String lockedBy, String requestId) async {
                                                                       }
                                                                     },
                                                             ),
+                                                            if (state.adminType ==
+                                                          'admin' || state.adminType ==
+                                                          'concierge')
                                                             IconButton(
                                                               icon: const Icon(Icons
                                                                   .remove_red_eye_outlined),
@@ -1570,7 +1578,7 @@ Future<void> _releasedRequest(String lockedBy, String requestId) async {
                                                             ),
                                                           ],
                                                         );
-                                                      }
+                                                      
                                                     }
                                                     return const SizedBox
                                                         .shrink();
@@ -1581,7 +1589,9 @@ Future<void> _releasedRequest(String lockedBy, String requestId) async {
                                                       .more_vert), // Three-dot icon
                                                   onPressed: () {
                                                     // Show the modal when the three-dot icon is clicked
-                                                    
+                                                    String patientName="${request['patient_fname']} ${request['patient_lname']}";
+                                                    String cardNo=request['card_number'] ?? 'N/A';
+                                                    String serviceType=request['form_type'];
                                                     String doctorName='N/A';
                                                     String notesValue = '';
                                                     if(request['doctor_fname']!=null && request['doctor_lname']!=null){
@@ -1688,6 +1698,21 @@ Future<void> _releasedRequest(String lockedBy, String requestId) async {
                                                                               bottom: BorderSide(color: Colors.grey), // Bottom border line
                                                                             ),
                                                                             children: [
+                                                                              
+                                                                              TableRow(children: [
+                                                                                const Text("Patient Name", style: TextStyle(color: Colors.black)),
+                                                                                Text(patientName ?? 'N/A', style: const TextStyle(color: Colors.black)),
+                                                                              ]),
+                                                                              
+                                                                              TableRow(children: [
+                                                                                const Text("Card Number", style: TextStyle(color: Colors.black)),
+                                                                                Text(cardNo?? 'N/A', style: const TextStyle(color: Colors.black)),
+                                                                              ]),
+                                                                              
+                                                                              TableRow(children: [
+                                                                                const Text("Service Type", style: TextStyle(color: Colors.black)),
+                                                                                Text(serviceType ?? 'N/A', style: const TextStyle(color: Colors.black)),
+                                                                              ]),
                                                                               TableRow(children: [
                                                                                 const Text("Location", style: TextStyle(color: Colors.black)),
                                                                                 Text(request['location'] ?? 'N/A', style: const TextStyle(color: Colors.black)),
