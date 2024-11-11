@@ -83,7 +83,7 @@ class AdminBloc extends Bloc<AdminEvent, AdminState> {
       } else if (filterCriteria == 'status') {
         final userStatus = admin['status'];
         final statusPrefix = userStatus.substring(0, 3).toLowerCase();
-        return statusPrefix.contains(query);
+        return statusPrefix.contains(query) || userStatus==query;
       } else {
         // Handle other filters similarly
         return false;

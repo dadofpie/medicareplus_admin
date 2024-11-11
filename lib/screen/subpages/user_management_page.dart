@@ -4715,6 +4715,8 @@ class TableCellContent extends StatelessWidget {
       child: Text(
         content,
         style: const TextStyle(color: Color(0xff13322b)),
+        overflow: TextOverflow.ellipsis, // Add this line
+        maxLines: 1, // Optional: Limits the text to a single line
       ),
     );
   }
