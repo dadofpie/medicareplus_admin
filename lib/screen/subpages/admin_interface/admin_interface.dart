@@ -329,6 +329,7 @@ class _AdminInterfaceState extends State<AdminInterface> {
   void _showAddAdminDialog(BuildContext context) {
     showDialog(
       context: context,
+      barrierDismissible: false,
       builder: (BuildContext context) {
         return const AddAdminDialog();
       },

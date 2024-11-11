@@ -1289,7 +1289,7 @@ class _UserManagementPageState extends State<UserManagementPage> {
                                                 if (state.adminType == 'admin') {
                                                   return Row(
                                                     children: [
-                                                      IconButton(
+                                                      /*IconButton(
                                                         icon: const Icon(Icons
                                                             .block), // Circle with vertical line slash icon
                                                         onPressed: () {
@@ -1332,7 +1332,7 @@ class _UserManagementPageState extends State<UserManagementPage> {
                                                       ),
                                                       const SizedBox(
                                                           width:
-                                                              10), // Space between icons
+                                                              10), */// Space between icons
                                                       IconButton(
                                                         icon: const Icon(
                                                             Icons.edit), // Edit icon

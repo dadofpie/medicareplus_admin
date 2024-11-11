@@ -34,7 +34,6 @@ class _AddAdminDialogState extends State<AddAdminDialog> {
 void _showMessage(String message, String title) {
     showDialog(
       context: context,
-      barrierDismissible: false,
       builder: (context) {
         return AlertDialog(
           backgroundColor: Colors.white,
@@ -291,90 +290,127 @@ void _showMessage(String message, String title) {
                       ],
                     ),
                     const SizedBox(height: 20),
-                    SizedBox(
-                      width: 200, // Set your desired width
-                      height: 40, // Set your desired height
-                      child: ElevatedButton(
-                        onPressed: () async {
-                          if(roleController.text.isEmpty){
-                            setState(() {
-                              label='Please select role type';
-                            });
-                          }
-                          if (!_formKey.currentState!.validate())return;
-                          
-                          if(fnameController.text.isNotEmpty && lnameController.text.isNotEmpty && emailController.text.isNotEmpty && passwordController.text.isNotEmpty && roleController.text.isNotEmpty && passwordController.text.length>=6){
-                            
-                            setState(() {
-                              _isLoading=true;
-                            });
-                            String url = 'https://medicareplus-api.vercel.app/api/admin/add_admin'; // Replace with your actual API URL
-                            final Map<String, String> headers = {
-                              'supabase-url': supabaseUrl, // Replace with your Supabase URL
-                              'supabase-key': supabaseKey, // Replace with your Supabase Key
-                              'Content-Type': 'application/json',
-                            };
-                  
-                            final Map<String, dynamic> body = {
-                              'admin_type': roleController.text,
-                              'fname': fnameController.text,
-                              'mname': mnameController.text,
-                              'lname': lnameController.text,
-                              'email': emailController.text,
-                              'password': passwordController.text,
-                              'contact_no': contactNoController.text,
-                              'department_id':roleController.text
-                              // Add any other fields as necessary
-                            };
-                  
-                            try {
-                              final response = await http.post(
-                                Uri.parse(url),
-                                headers: headers,
-                                body: jsonEncode(body),
-                              );
-                  
-                              if (response.statusCode == 200) {
-                                final data = jsonDecode(response.body);
-                                // Handle success (e.g., show a success message)
-                                Navigator.of(context).popUntil((route) => route.isFirst);
-                                _showMessage('New user added','Successfully Added');
-                                roleController.text='';
-                                fnameController.text='';
-                                mnameController.text='';
-                                lnameController.text='';
-                                emailController.text='';
-                                passwordController.text='';
-                                contactNoController.text='';
-                                roleController.text='';
-                                _isLoading=false;
-                                context.read<AdminBloc>().add(FetchAdminAccountsEvent());
-                              } else {
-                                final errorData = jsonDecode(response.body);
-                                // Handle error (e.g., show an error message)
-                                _isLoading=false;
-                                _showMessage('User not added on database','Error in creation');
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        SizedBox(
+                                    width:
+                                        200, // Same width for the Select Files button
+                                    height:
+                                        40, // Same height for the Select Files button
+                                    child: ElevatedButton(
+                                      onPressed: () {
+                                        Navigator.pop(
+                                            context); // Close the dialog
+                                      },
+                                      style: ElevatedButton.styleFrom(
+                                        shape: RoundedRectangleBorder(
+                                          borderRadius:
+                                              BorderRadius.circular(5),
+                                          side: const BorderSide(
+                                              color: Color(
+                                                  0xff13322b)), // Set the border color
+                                        ),
+                                        backgroundColor: Colors
+                                            .white, // Set button background color to white
+                                      ),
+                                      child: const Text(
+                                        'Close',
+                                        style: TextStyle(
+                                            color: Colors
+                                                .black), // Set button text color to black for visibility
+                                      ),
+                                    ),
+                                  ),
+                                  const SizedBox(width: 20),
+                        SizedBox(
+                          width: 200, // Set your desired width
+                          height: 40, // Set your desired height
+                          child: ElevatedButton(
+                            onPressed: () async {
+                              if(roleController.text.isEmpty){
+                                setState(() {
+                                  label='Please select role type';
+                                });
                               }
-                            } catch (e) {
-                              // Handle unexpected errors
-                              _isLoading=false;
-                              ScaffoldMessenger.of(context).showSnackBar(
-                                SnackBar(content: Text('An error occurred: $e')),
-                              );
-                            }
-                  
-                          }
-                                                },
-                        style: ElevatedButton.styleFrom(
-                          shape: RoundedRectangleBorder(
-                                  borderRadius: BorderRadius.circular(5)),
-                          backgroundColor: const Color(0xff13322b),
-                          padding: const EdgeInsets.symmetric(vertical: 15),
-                          textStyle: const TextStyle(fontSize: 16),
+                              if (!_formKey.currentState!.validate())return;
+                              
+                              if(fnameController.text.isNotEmpty && lnameController.text.isNotEmpty && emailController.text.isNotEmpty && passwordController.text.isNotEmpty && roleController.text.isNotEmpty && passwordController.text.length>=6){
+                                
+                                setState(() {
+                                  _isLoading=true;
+                                });
+                                String url = 'https://medicareplus-api.vercel.app/api/admin/add_admin'; // Replace with your actual API URL
+                                final Map<String, String> headers = {
+                                  'supabase-url': supabaseUrl, // Replace with your Supabase URL
+                                  'supabase-key': supabaseKey, // Replace with your Supabase Key
+                                  'Content-Type': 'application/json',
+                                };
+                                          
+                                final Map<String, dynamic> body = {
+                                  'admin_type': roleController.text,
+                                  'fname': fnameController.text,
+                                  'mname': mnameController.text,
+                                  'lname': lnameController.text,
+                                  'email': emailController.text,
+                                  'password': passwordController.text,
+                                  'contact_no': contactNoController.text,
+                                  'department_id':roleController.text
+                                  // Add any other fields as necessary
+                                };
+                                          
+                                try {
+                                  final response = await http.post(
+                                    Uri.parse(url),
+                                    headers: headers,
+                                    body: jsonEncode(body),
+                                  );
+                                          
+                                  if (response.statusCode == 200) {
+                                    final data = jsonDecode(response.body);
+                                    // Handle success (e.g., show a success message)
+                                    Navigator.of(context).popUntil((route) => route.isFirst);
+                                    _showMessage('New user added','Successfully Added');
+                                    roleController.text='';
+                                    fnameController.text='';
+                                    mnameController.text='';
+                                    lnameController.text='';
+                                    emailController.text='';
+                                    passwordController.text='';
+                                    contactNoController.text='';
+                                    roleController.text='';
+                                    _isLoading=false;
+                                    context.read<AdminBloc>().add(FetchAdminAccountsEvent());
+                                  } else {
+                                    final errorData = jsonDecode(response.body);
+                                    // Handle error (e.g., show an error message)
+                                    _isLoading=false;
+                                    _showMessage('User not added on database','Error in creation');
+                                  }
+                                } catch (e) {
+                                  // Handle unexpected errors
+                                  _isLoading=false;
+                                  ScaffoldMessenger.of(context).showSnackBar(
+                                    SnackBar(content: Text('An error occurred: $e')),
+                                  );
+                                }
+                                          
+                              }
+                                                    },
+                            style: ElevatedButton.styleFrom(
+                              shape: RoundedRectangleBorder(
+                                      borderRadius: BorderRadius.circular(5)),
+                              backgroundColor: const Color(0xff13322b),
+                              padding: const EdgeInsets.symmetric(vertical: 15),
+                              textStyle: const TextStyle(fontSize: 16),
+                            ),
+                            child: const Text('Add Admin', style: TextStyle(color: Colors.white)),
+                          ),
                         ),
-                        child: const Text('Add Admin', style: TextStyle(color: Colors.white)),
-                      ),
+                      ],
                     ),
+
+                    
                   ],
                                 ),
                 )));

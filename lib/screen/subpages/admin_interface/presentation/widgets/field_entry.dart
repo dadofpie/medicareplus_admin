@@ -112,6 +112,7 @@ class FieldEntry extends StatelessWidget {
   void _showEditAdminDialog(BuildContext context) {
     showDialog(
       context: context,
+      barrierDismissible: false,
       builder: (BuildContext context) {
         return EditAdminDialog(
           fname: firstName,
