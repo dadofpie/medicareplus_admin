@@ -202,6 +202,39 @@ Future<void> _pickFiles(StateSetter setState) async {
 }
 
 
+Future<void> _releasedRequest(String lockedBy, String requestId) async {
+  String url = '$apiUrl/released_request_form';
+
+  final Map<String, dynamic> data = {
+    'locked_by': lockedBy,
+    'request_id': requestId,
+  };
+
+  try {
+    final response = await http.post(
+      Uri.parse(url),
+      headers: {
+        'Content-Type': 'application/json',
+        'supabase-url': supabaseUrl,
+        'supabase-key': supabaseKey,
+      },
+      body: json.encode(data),
+    );
+
+    if (response.statusCode == 200) {
+      final responseData = json.decode(response.body);
+      print('Request is locked: ${responseData['message']}');
+      
+    } else {
+      final errorData = json.decode(response.body);
+      print('Error: ${errorData['error']}');
+    }
+  } catch (error) {
+    print('Unexpected error: $error');
+  }
+}
+
+
 
   Future<bool> _updateRequestForm(String requestId, String status, String name,
       String userId, String bucketName, String rejectReason) async {
@@ -1356,8 +1389,8 @@ Future<void> _pickFiles(StateSetter setState) async {
                                                                       if(lockedId==authState.uid.toString()){
                                                                         
                                                                       showDialog(
-                                                                        context:
-                                                                            context,
+                                                                        context: context,
+                                                                        barrierDismissible: false,
                                                                         builder:
                                                                             (BuildContext
                                                                                 context) {
@@ -1477,6 +1510,9 @@ Future<void> _pickFiles(StateSetter setState) async {
                                                                                   ),
                                                                                   TextButton(
                                                                                     onPressed:!isLoading? () {
+                                                                                      setState((){
+                                                                                          _releasedRequest(authState.uid.toString() ,request['request_id'].toString());
+                                                                                      });
                                                                                       Navigator.of(context).pop();
                                                                                     }:null,
                                                                                     style: TextButton.styleFrom(
@@ -1600,6 +1636,7 @@ Future<void> _pickFiles(StateSetter setState) async {
                                                     }
                                                     showDialog(
                                                       context: context,
+                                                      barrierDismissible: false,
                                                       builder: (BuildContext
                                                           context) {
                                                         return AlertDialog(
@@ -1773,6 +1810,7 @@ Future<void> _pickFiles(StateSetter setState) async {
     bool _isLoading = false;
     showDialog(
       context: context,
+      barrierDismissible: false,
       builder: (BuildContext context) {
         return StatefulBuilder(
           builder: (BuildContext context, setState) {
@@ -1893,6 +1931,7 @@ Future<void> _pickFiles(StateSetter setState) async {
                   Navigator.of(context).pop();
                   setState((){
                     _selectedFiles = null;
+                    _releasedRequest(uid ,request['request_id'].toString());
                   });
                 }:null,
                 style: TextButton.styleFrom(
@@ -1918,6 +1957,7 @@ Future<void> _pickFiles(StateSetter setState) async {
       BuildContext context, List<String> imageUrls, String name) {
     showDialog(
       context: context,
+      barrierDismissible: false,
       builder: (BuildContext context) {
         return AlertDialog(
           title: const Text('Images'),

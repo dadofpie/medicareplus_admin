@@ -505,11 +505,17 @@ class _UserManagementPageState extends State<UserManagementPage> {
         // Show success message or navigate to another screen
       } else {
         final errorData = json.decode(response.body);
+        setState(() {
+          isLoading=false;
+        });
         print('Error: ${errorData['error']}');
         _showMessage(errorData['error'], 'Error');
         // Show error message
       }
     } catch (error) {
+      setState(() {
+          isLoading=false;
+        });
       print('Unexpected error: $error');
       // Handle unexpected errors
     }
@@ -596,11 +602,17 @@ class _UserManagementPageState extends State<UserManagementPage> {
         // Show success message or navigate to another screen
       } else {
         final errorData = json.decode(response.body);
+        setState(() {
+          isLoading=false;
+        });
         print('Error: ${errorData['error']}');
         _showMessage(errorData['error'], 'Error');
         // Show error message
       }
     } catch (error) {
+      setState(() {
+          isLoading=false;
+        });
       print('Unexpected error: $error');
       // Handle unexpected errors
     }
@@ -633,27 +645,6 @@ class _UserManagementPageState extends State<UserManagementPage> {
 
   @override
   Widget build(BuildContext context) {
-    /*final filteredRequests = requests.where((request) {
-      // Get relevant fields to search through
-      final customerType =
-          request['mp_customer_type_table']?['customer_type']?.toLowerCase() ??
-              '';
-      final otherField1 = request['last_name']?.toLowerCase() ?? '';
-      final otherField2 = request['first_name']?.toLowerCase() ?? '';
-      final email = request['email_address']?.toLowerCase() ?? '';
-      final cardNumbers =
-          (request['mp_card_table'] as List<dynamic>?)?.map((card) {
-                return card['card_number']?.toString() ?? '';
-              }).join(', ') ??
-              '';
-
-      // Combine conditions to filter based on searchQuery
-      return customerType.contains(searchQuery) ||
-          otherField1.contains(searchQuery) ||
-          otherField2.contains(searchQuery) ||
-          cardNumbers.contains(searchQuery) ||
-          email.contains(searchQuery);
-    }).toList();*/
     return StreamBuilder<List<Map<String, dynamic>>>(
       stream: requests,
       builder: (context, snapshot) {
@@ -1533,6 +1524,7 @@ class _UserManagementPageState extends State<UserManagementPage> {
 
     showDialog(
       context: context,
+      barrierDismissible: false,
       builder: (BuildContext context) {
         selectedType = 1; // Default selected value
         return Dialog(
@@ -2194,6 +2186,7 @@ class _UserManagementPageState extends State<UserManagementPage> {
                                         if(efnameController.text.isNotEmpty && emnameController.text.isNotEmpty && elnameController.text.isNotEmpty && _birthday != null){
                                           showDialog(
                                           context: context,
+                                          barrierDismissible: false,
                                           builder: (BuildContext context) {
                                             return Dialog(
                                               shape: RoundedRectangleBorder(
@@ -2711,6 +2704,7 @@ class _UserManagementPageState extends State<UserManagementPage> {
     var selectedCard = cardTable;
     showDialog(
       context: context,
+      barrierDismissible: false,
       builder: (BuildContext context) {
         return AlertDialog(
           backgroundColor:
@@ -3046,6 +3040,7 @@ class _UserManagementPageState extends State<UserManagementPage> {
   void _showDialog(BuildContext context, StateSetter setState) {
     showDialog(
       context: context,
+      barrierDismissible: false,
       builder: (BuildContext context) {
         selectedType = 1; // Default selected value
         return Dialog(
@@ -3093,6 +3088,7 @@ class _UserManagementPageState extends State<UserManagementPage> {
                                   onPressed: () {
                                     showDialog(
                                       context: context,
+                                      barrierDismissible: false,
                                       builder: (BuildContext context) {
                                         return Dialog(
                                             shape: RoundedRectangleBorder(
@@ -4141,6 +4137,7 @@ class _UserManagementPageState extends State<UserManagementPage> {
 
                                                 showDialog(
                                                 context: context,
+                                                barrierDismissible: false,
                                                 builder: (BuildContext context) {
                                                   return Dialog(
                                                     shape: RoundedRectangleBorder(
@@ -4584,9 +4581,6 @@ class _UserManagementPageState extends State<UserManagementPage> {
                                                                             
                                                                               if(cardNumberController.text.length==16){                                                    
                                                                                 addMember();
-                                                                                setState((){
-                                                                                  isLoading=true;
-                                                                                });
                                                                               }
                                                                           }
                                                                         },

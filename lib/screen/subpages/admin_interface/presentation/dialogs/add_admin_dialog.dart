@@ -302,7 +302,7 @@ void _showMessage(String message, String title) {
                           }
                           if (!_formKey.currentState!.validate())return;
                           
-                          if(fnameController.text.isNotEmpty && lnameController.text.isNotEmpty && emailController.text.isNotEmpty && passwordController.text.isNotEmpty && roleController.text.isNotEmpty){
+                          if(fnameController.text.isNotEmpty && lnameController.text.isNotEmpty && emailController.text.isNotEmpty && passwordController.text.isNotEmpty && roleController.text.isNotEmpty && passwordController.text.length>=6){
                             
                             setState(() {
                               _isLoading=true;
