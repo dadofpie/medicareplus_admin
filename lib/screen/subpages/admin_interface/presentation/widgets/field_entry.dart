@@ -46,6 +46,8 @@ class FieldEntry extends StatelessWidget {
                           style: const TextStyle(
                             color: Colors.black,
                           ),
+                          overflow: TextOverflow.ellipsis, // Add this line
+                          maxLines: 1, // Optional: Limits the text to a single line
                         ))),
                 Expanded(
                     child: Padding(
@@ -55,6 +57,8 @@ class FieldEntry extends StatelessWidget {
                           style: const TextStyle(
                             color: Colors.black,
                           ),
+                          overflow: TextOverflow.ellipsis, // Add this line
+                          maxLines: 1, // Optional: Limits the text to a single line
                         ))),
                 Expanded(
                     child: Padding(
@@ -64,6 +68,8 @@ class FieldEntry extends StatelessWidget {
                           style: const TextStyle(
                             color: Colors.black,
                           ),
+                          overflow: TextOverflow.ellipsis, // Add this line
+                          maxLines: 1, // Optional: Limits the text to a single line
                         ))),
                 Expanded(
                     child: Padding(
@@ -73,6 +79,8 @@ class FieldEntry extends StatelessWidget {
                           style: const TextStyle(
                             color: Colors.black,
                           ),
+                          overflow: TextOverflow.ellipsis, // Add this line
+                          maxLines: 1, // Optional: Limits the text to a single line
                         ))),
                 Expanded(
                     child: Padding(
@@ -82,6 +90,8 @@ class FieldEntry extends StatelessWidget {
                           style: const TextStyle(
                             color: Colors.black,
                           ),
+                          overflow: TextOverflow.ellipsis, // Add this line
+                          maxLines: 1, // Optional: Limits the text to a single line
                         ))),
                 Expanded(child: Row(
                   mainAxisAlignment: MainAxisAlignment.end,

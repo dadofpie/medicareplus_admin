@@ -53,6 +53,28 @@ class _EditAdminDialogState extends State<EditAdminDialog> {
     roleController.text = widget.role;
     statusController.text = widget.status;
     adminId=widget.id;
+
+    fnameController.addListener(_onFieldChange);
+    mnameController.addListener(_onFieldChange);
+    lnameController.addListener(_onFieldChange);
+    roleController.addListener(_onFieldChange);
+    statusController.addListener(_onFieldChange);
+    contactNoController.addListener(_onFieldChange);
+  }
+
+  @override
+  void dispose() {
+    // Dispose of the controllers to avoid memory leaks
+    fnameController.dispose();
+    mnameController.dispose();
+    lnameController.dispose();
+    roleController.dispose();
+    statusController.dispose();
+    super.dispose();
+  }
+
+  void _onFieldChange() {
+    setState(() {});
   }
 
   void _showMessage(String message, String title) {
@@ -330,6 +352,12 @@ class _EditAdminDialogState extends State<EditAdminDialog> {
                                       ),
                                     ),
                                     const SizedBox(width: 20),
+                        if(widget.fname != fnameController.text ||
+                              widget.mname != mnameController.text ||
+                              widget.lname != lnameController.text ||
+                              widget.role != roleController.text ||
+                              widget.status != statusController.text 
+                             )
                         SizedBox(
                           width: 200, // Set your desired width
                           height: 40, // Set your desired height
@@ -396,8 +424,7 @@ class _EditAdminDialogState extends State<EditAdminDialog> {
                                 }
                         
                                 }
-                              
-                                                    },
+                              },
                             style: ElevatedButton.styleFrom(
                               shape: RoundedRectangleBorder(
                                         borderRadius: BorderRadius.circular(5)),
