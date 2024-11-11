@@ -57,6 +57,7 @@ class _EditAdminDialogState extends State<EditAdminDialog> {
   void _showMessage(String message, String title) {
     showDialog(
       context: context,
+      barrierDismissible: false,
       builder: (context) {
         return AlertDialog(
           backgroundColor: Colors.white,

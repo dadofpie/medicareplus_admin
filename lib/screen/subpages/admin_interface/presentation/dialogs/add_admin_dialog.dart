@@ -34,6 +34,7 @@ class _AddAdminDialogState extends State<AddAdminDialog> {
 void _showMessage(String message, String title) {
     showDialog(
       context: context,
+      barrierDismissible: false,
       builder: (context) {
         return AlertDialog(
           backgroundColor: Colors.white,

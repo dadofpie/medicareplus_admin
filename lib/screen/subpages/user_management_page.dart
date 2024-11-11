@@ -1702,6 +1702,7 @@ class _UserManagementPageState extends State<UserManagementPage> {
                                 ),
                                 controller: eemailController,
                                 isNumeric: false,
+                                isEmail: true,
                                 validator: (value) {
                                   /*
 
