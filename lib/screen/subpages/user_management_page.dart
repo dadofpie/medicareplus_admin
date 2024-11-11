@@ -601,10 +601,10 @@ class _UserManagementPageState extends State<UserManagementPage> {
         });
         // Show success message or navigate to another screen
       } else {
-        final errorData = json.decode(response.body);
         setState(() {
           isLoading=false;
         });
+        final errorData = json.decode(response.body);
         print('Error: ${errorData['error']}');
         _showMessage(errorData['error'], 'Error');
         // Show error message
@@ -4581,7 +4581,11 @@ class _UserManagementPageState extends State<UserManagementPage> {
                                                                           if(roomAndBoardLimitController.text.isNotEmpty && benefitLimitController.text.isNotEmpty&&cardNumberController.text.isNotEmpty){
                                                                             
                                                                               if(cardNumberController.text.length==16){                                                    
+                                                                                
                                                                                 addMember();
+                                                                                setState(() {
+                                                                                  isLoading=true;
+                                                                                });
                                                                               }
                                                                           }
                                                                         },
@@ -4684,6 +4688,9 @@ class _UserManagementPageState extends State<UserManagementPage> {
                   style: TextStyle(fontSize: 16, color: Color(0xff13322b))),
               onPressed: () {
                 Navigator.of(context).pop();
+                setState(() {
+                  isLoading=false;
+                });
               },
             ),
           ],

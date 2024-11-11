@@ -203,9 +203,7 @@ void _showMessage(String message, String title) {
                                 return 'Email address is required';
                               } else if (value.length < 6) {
                                 return 'Email address must be at least 6 characters long';
-                              } else if (!value.endsWith('.com')) {
-                                return 'Email address must end with ".com"';
-                              } else if (!regExp.hasMatch(value)) {
+                              }  else if (!regExp.hasMatch(value)) {
                                 return 'Please input a valid email';
                               } 
                               return null;
@@ -335,7 +333,7 @@ void _showMessage(String message, String title) {
                               }
                               if (!_formKey.currentState!.validate())return;
                               
-                              if(fnameController.text.isNotEmpty && lnameController.text.isNotEmpty && emailController.text.isNotEmpty && passwordController.text.isNotEmpty && roleController.text.isNotEmpty && passwordController.text.length>=6){
+                              if(fnameController.text.isNotEmpty && lnameController.text.isNotEmpty && emailController.text.isNotEmpty && passwordController.text.isNotEmpty && roleController.text.isNotEmpty && passwordController.text.length>=6 && contactNoController.text.length>=11){
                                 
                                 setState(() {
                                   _isLoading=true;

@@ -69,7 +69,8 @@ class AdminBloc extends Bloc<AdminEvent, AdminState> {
       if (filterCriteria == 'member') {
         final firstName = (admin['first_name'] as String?)?.toLowerCase() ?? '';
         final lastName = (admin['last_name'] as String?)?.toLowerCase() ?? '';
-        return firstName.contains(query) || lastName.contains(query);
+        final fullName= '$lastName, $firstName';
+        return fullName.contains(query);
       } else if (filterCriteria == 'role') {
         final role = admin['mp_admin_type_table']['admin_type'].toString() ;
         return role.contains(query);

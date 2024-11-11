@@ -82,7 +82,7 @@ class AuthBloc extends Bloc<AuthEvent, AuthState> {
       // Email validation using regex
       if (!RegExp(r'^.+@[a-zA-Z]+\.{1}[a-zA-Z]+(\.{0,1}[a-zA-Z]+)$')
           .hasMatch(email)) {
-        emit(AuthFailure('Wrong password or email, inactive account'));
+        emit(AuthFailure('Incorrect email or password, or account inactive. Please try again or contact support.'));
         return;
       }
       if (password.length < 6) {
