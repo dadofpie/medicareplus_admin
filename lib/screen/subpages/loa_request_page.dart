@@ -51,7 +51,7 @@ class _LoaRequestPageState extends State<LoaRequestPage> {
     super.initState();
     _apiService = ApiService(
         'https://medicareplus-api.vercel.app'); // Replace with your actual API URL
-    _members = _apiService.streamAllMembers(supabaseUrl, supabaseKey);
+    _members = _apiService.streamAllRequest(supabaseUrl, supabaseKey);
     // Initialize the service with your endpoint
   }
 
@@ -155,6 +155,49 @@ Future<void> _pickFiles(StateSetter setState) async {
     }
   } catch (e) {
     print('Error picking files: $e');
+  }
+}
+
+
+  Future<String> _lockedRequest(String lockedBy, String requestId) async {
+  String url = '$apiUrl/locked_request_form';
+
+  final Map<String, dynamic> data = {
+    'locked_by': lockedBy,
+    'request_id': requestId,
+  };
+
+  try {
+    final response = await http.post(
+      Uri.parse(url),
+      headers: {
+        'Content-Type': 'application/json',
+        'supabase-url': supabaseUrl,
+        'supabase-key': supabaseKey,
+      },
+      body: json.encode(data),
+    );
+
+    if (response.statusCode == 200) {
+      final responseData = json.decode(response.body);
+      print('Request is locked: ${responseData['message']}');
+      
+      // Access the locked_by value returned from the server
+      String lockedByValue = responseData['locked_by'].toString();
+      print('locked_by value: $lockedByValue');
+      
+      // Return the locked_by value
+      return lockedByValue;
+    } else {
+      final errorData = json.decode(response.body);
+      print('Error: ${errorData['error']}');
+      // Return an error message or some default value
+      return 'Error: ${errorData['error']}';
+    }
+  } catch (error) {
+    print('Unexpected error: $error');
+    // Return a default error message
+    return 'Unexpected error occurred';
   }
 }
 
@@ -1278,79 +1321,20 @@ Future<void> _pickFiles(StateSetter setState) async {
                                                                       request['status'] ==
                                                                           'rejected' || request['status']=='cancelled'
                                                                   ? null // Disable if status is approved or rejected
-                                                                  : () {
+                                                                  : () async {
                                                                       // Show green modal when check icon is clicked
-                                                                      showApprovalDialog(
+                                                                      String lockedId = await _lockedRequest(authState.uid.toString(), request['request_id'].toString());
+                                                                      if(lockedId==authState.uid.toString()){
+                                                                        showApprovalDialog(
                                                                           context,
                                                                           request,
                                                                           setState,
                                                                           authState
                                                                               .uid
                                                                               .toString());
-                                                                      /*showDialog(
-                                                                        context:
-                                                                            context,
-                                                                        builder:
-                                                                            (BuildContext
-                                                                                context) {
-                                                                          return AlertDialog(
-                                                                            backgroundColor:
-                                                                                const Color(0xff66cce9),
-                                                                            title:
-                                                                                const Text(
-                                                                              'APPROVED',
-                                                                              style: TextStyle(color: Colors.white),
-                                                                            ),
-                                                                            content:
-                                                                                Column(
-                                                                              mainAxisSize: MainAxisSize.min,
-                                                                              crossAxisAlignment: CrossAxisAlignment.center,
-                                                                              children: [
-                                                                                SizedBox(
-                                                                                  width: 200,
-                                                                                  height: 40,
-                                                                                  child: ElevatedButton(
-                                                                                    onPressed: _pickFiles,
-                                                                                    style: ElevatedButton.styleFrom(
-                                                                                      shape: RoundedRectangleBorder(
-                                                                                        borderRadius: BorderRadius.circular(5),
-                                                                                      ),
-                                                                                    ),
-                                                                                    child: const Text('Select Files'),
-                                                                                  ),
-                                                                                ),
-                                                                                if (_selectedFiles != null) ..._selectedFiles!.map((file) => Text(file.name)),
-                                                                              ],
-                                                                            ),
-                                                                            actions: [
-                                                                              TextButton(
-                                                                                onPressed: () async {
-                                                                                  String fullName = '${request['patient_lname']}${request['patient_fname']}';
-                                                                                  bool isStated = await _updateRequestForm(request['request_id'].toString(), 'approved', fullName, authState.uid.toString(), 'forms', '');
-                                                                                  if (isStated) {
-                                                                                    _showMessage('Done approving LOA request id: ${request['request_id']}', 'Done Approval');
-                                                                                  } else {
-                                                                                    _showMessage(message.isNotEmpty?message:'Error on updating please check if upload file has value', 'Error');
-                                                                                  }
-                                                                                },
-                                                                                child: const Text(
-                                                                                  'Submit',
-                                                                                  style: TextStyle(color: Colors.white),
-                                                                                ),
-                                                                              ),
-                                                                              TextButton(
-                                                                                onPressed: () {
-                                                                                  Navigator.of(context).pop();
-                                                                                },
-                                                                                child: const Text(
-                                                                                  'Close',
-                                                                                  style: TextStyle(color: Colors.white),
-                                                                                ),
-                                                                              ),
-                                                                            ],
-                                                                          );
-                                                                        },
-                                                                      );*/
+                                                                      }else{
+                                                                       _showMessage('Request is currently being processed by another user','Error');
+                                                                      }
                                                                     },
                                                             ),
                                                             IconButton(
@@ -1362,12 +1346,15 @@ Future<void> _pickFiles(StateSetter setState) async {
                                                                       request['status'] ==
                                                                           'rejected' || request['status']=='cancelled'
                                                                   ? null // Disable if status is approved or rejected
-                                                                  : () {
+                                                                  : () async{
                                                                       // Show red modal when close icon is clicked
                                                                       bool isLoading = false; // Add this variable to manage loading state
                                                                       /*setState(() {
                                                                         isReject=false;
                                                                       });*/
+                                                                      String lockedId = await _lockedRequest(authState.uid.toString(), request['request_id'].toString());
+                                                                      if(lockedId==authState.uid.toString()){
+                                                                        
                                                                       showDialog(
                                                                         context:
                                                                             context,
@@ -1509,6 +1496,9 @@ Future<void> _pickFiles(StateSetter setState) async {
                                                                           );
                                                                         },
                                                                       );
+                                                                      }else{
+                                                                       _showMessage('Request is currently being processed by another user','Error');
+                                                                      }
                                                                     },
                                                             ),
                                                             IconButton(

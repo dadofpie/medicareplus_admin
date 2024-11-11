@@ -27,7 +27,7 @@ class ApiService {
     }
   }
 
-  Stream<List<Map<String, dynamic>>> streamAllMembers(String supabaseUrl, String supabaseKey) async* {
+  Stream<List<Map<String, dynamic>>> streamAllRequest(String supabaseUrl, String supabaseKey) async* {
     while (true) {
       try {
         final members = await fetchAllMembers(supabaseUrl, supabaseKey);
@@ -37,7 +37,7 @@ class ApiService {
         yield []; // Emit an empty list on error
       }
 
-      await Future.delayed(const Duration(seconds: 5)); // Refresh every 10 seconds
+      await Future.delayed(const Duration(seconds: 1)); // Refresh every 10 seconds
     }
   }
 
