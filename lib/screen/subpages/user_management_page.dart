@@ -33,7 +33,7 @@ class _UserManagementPageState extends State<UserManagementPage> {
   String? selectedDate;
   bool isAscending = true;
   String? _selectedSex;
-  String _eselectedSex ='';
+  String? _eselectedSex;
   DateTime? _birthday;
   int? selectedType;
   bool isLoading = false;
@@ -583,7 +583,7 @@ class _UserManagementPageState extends State<UserManagementPage> {
   }
 
 
-  Future<void> addMember() async {
+  Future<void> addMember(StateSetter setState) async {
     String url ='$apiUrl/add_member'; // Replace with your actual API URL
     DateTime initialDate = DateTime.now();
     if(_birthday==null){
@@ -2210,6 +2210,8 @@ class _UserManagementPageState extends State<UserManagementPage> {
                                           eroomAndBoardLimitController.text='';
                                           _isFormValid=true;
                                           selectedRegion=null;
+                                          _eselectedSex=null;
+                                          _birthday=null;
                                         });
                                         Navigator.pop(
                                             context); // Close the dialog
@@ -4643,7 +4645,7 @@ class _UserManagementPageState extends State<UserManagementPage> {
                                                                             
                                                                               if(cardNumberController.text.length==16){                                                    
                                                                                 
-                                                                                addMember();
+                                                                                addMember(setState);
                                                                                 setState(() {
                                                                                   isLoading=true;
                                                                                 });
