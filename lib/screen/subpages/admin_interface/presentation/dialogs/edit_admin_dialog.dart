@@ -358,7 +358,8 @@ class _EditAdminDialogState extends State<EditAdminDialog> {
                               widget.lname != lnameController.text ||
                               widget.role != roleController.text ||
                               widget.status != statusController.text ||
-                              widget.contact != contactNoController.text
+                              widget.contact != contactNoController.text ||
+                              widget.email != emailController.text
                              )
                         SizedBox(
                           width: 200, // Set your desired width
