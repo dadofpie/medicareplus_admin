@@ -136,68 +136,15 @@ class _UserManagementPageState extends State<UserManagementPage> {
         'https://medicareplus-api.vercel.app');
     requests = _apiService.streamMembers(supabaseUrl, supabaseKey);
 
-    efnameController.addListener(_onFieldChange);
-    emnameController.addListener(_onFieldChange);
-    elnameController.addListener(_onFieldChange);
-    econtactNoController.addListener(_onFieldChange);
-    eemailController.addListener(_onFieldChange);
-    epasswordController.addListener(_onFieldChange);
-    ehouseAddressController.addListener(_onFieldChange);
-    ebarangayController.addListener(_onFieldChange);
-    ecityController.addListener(_onFieldChange);
-    eprovinceController.addListener(_onFieldChange);
-    epostalCodeController.addListener(_onFieldChange);
-    ebirthdayController.addListener(_onFieldChange);
-    ecivilStatusController.addListener(_onFieldChange);
-    eregionController.addListener(_onFieldChange);
-    euserTypeController.addListener(_onFieldChange);
-    ecardNumberController.addListener(_onFieldChange);
-    ecardTypeController.addListener(_onFieldChange);
-    ememberTypeController.addListener(_onFieldChange);
-    eenrollmentTypeController.addListener(_onFieldChange);
-    eplanTypeController.addListener(_onFieldChange);
-    ebenefitLimitController.addListener(_onFieldChange);
-    ebenefitLimitTypeController.addListener(_onFieldChange);
-    eroomAndBoardTypeController.addListener(_onFieldChange);
-    eroomAndBoardLimitController.addListener(_onFieldChange);
+   
     
   }
-
 
   @override
   void dispose() {
     // Dispose of the controllers to avoid memory leaks
-    efnameController.dispose();
-    emnameController.dispose();
-    elnameController.dispose();
-    econtactNoController.dispose();
-    eemailController.dispose();
-    epasswordController.dispose();
-    ehouseAddressController.dispose();
-    ebarangayController.dispose();
-    ecityController.dispose();
-    eprovinceController.dispose();
-    epostalCodeController.dispose();
-    ebirthdayController.dispose();
-    ecivilStatusController.dispose();
-    eregionController.dispose();
-    euserTypeController.dispose();
-    ecardNumberController.dispose();
-    ecardTypeController.dispose();
-    ememberTypeController.dispose();
-    eenrollmentTypeController.dispose();
-    eplanTypeController.dispose();
-    ebenefitLimitController.dispose();
-    ebenefitLimitTypeController.dispose();
-    eroomAndBoardTypeController.dispose();
-    eroomAndBoardLimitController.dispose();
     super.dispose();
-  }
-
-  void _onFieldChange() {
-    setState(() {});
-  }
-  
+  }  
 
   int calculateAge(String birthday) {
   // Parse the date string to DateTime
@@ -449,7 +396,7 @@ class _UserManagementPageState extends State<UserManagementPage> {
     }
   }
 
-  Future<void> _selectDate(BuildContext context, StateSetter setState) async {
+  /*Future<void> _selectDate(BuildContext context, StateSetter setState, String period) async {
     // Get the initial date from the payperiod
     DateTime initialDate = DateTime.now();
     final DateTime? picked = await showDatePicker(
@@ -468,7 +415,42 @@ class _UserManagementPageState extends State<UserManagementPage> {
       _birthday=initialDate;
       return; // Exit if the birthday is not set
     }
+  }*/
+
+  Future<void> _selectDate(BuildContext context, StateSetter setState, String period) async {
+  // Default to the current date if the period is null or empty
+  DateTime initialDate = DateTime.now();
+
+  // If period is not empty or null, parse the period string into a DateTime
+  if (period.isNotEmpty) {
+    try {
+      initialDate = DateTime.parse(period); // period should be in 'yyyy-MM-dd' format
+    } catch (e) {
+      // If parsing fails, fallback to the current date
+      initialDate = DateTime.now();
+    }
   }
+
+  final DateTime? picked = await showDatePicker(
+    context: context,
+    initialDate: initialDate,
+    firstDate: DateTime(1900),
+    lastDate: DateTime.now(),
+  );
+
+  // If a date was picked, update the _birthday
+  setState(() {
+    _birthday = picked;
+  });
+
+  // Handle the case where no date was picked
+  if (_birthday == null) {
+    // Optionally show a message to inform the user
+    _birthday = initialDate;  // Use the initialDate if no date is picked
+    return; // Exit if no date is selected
+  }
+}
+
 
 // Helper function to convert PlatformFile to Uint8List
   Future<Uint8List> _getFileBytes(PlatformFile file) async {
@@ -1510,6 +1492,14 @@ class _UserManagementPageState extends State<UserManagementPage> {
       }else{
         _eselectedSex = request['sex'];
       }
+    
+    bool hasChange=false;
+    String address=request['address'] ?? '';
+    String brgy=request['barangay'] ?? '';
+    String city=request['city'] ?? '';
+    String myProvince=request['province'] ?? '';
+    String region=request['region'] ?? '';
+    String postal=request['postal_code'] ?? '';
     setState(() {
       efnameController.text=request['first_name'];
       emnameController.text=request['middle_name'];
@@ -1519,12 +1509,12 @@ class _UserManagementPageState extends State<UserManagementPage> {
       ememberTypeController.text=request['type_id'].toString();
       _birthday = request['birth_date'] != null ? DateTime.parse(request['birth_date']) : null;
       ecivilStatusController.text = request['civil_status'] ?? '';
-      ehouseAddressController.text=request['address'] ?? '';
-      ebarangayController.text=request['barangay'] ?? '';
-      ecityController.text=request['city'] ?? '';
-      eprovinceController.text=request['province'] ?? '';
-      eregionController.text=request['region'] ?? '';
-      epostalCodeController.text=request['postal_code'] ?? '';
+      ehouseAddressController.text=address;
+      ebarangayController.text=brgy;
+      ecityController.text=city;
+      eprovinceController.text=myProvince;
+      eregionController.text=region;
+      epostalCodeController.text=postal;
       eroomAndBoardLimitController.text=(selectedCard['mp_card_plan_table'] != null &&
                 selectedCard['mp_card_plan_table'].isNotEmpty)
             ? selectedCard['mp_card_plan_table'][0]['mp_plan_table']
@@ -1581,6 +1571,7 @@ class _UserManagementPageState extends State<UserManagementPage> {
         ecardTypeController.text = 'PSMBFI';
       }
       ecardNumberController.text = selectedCard['card_number'];
+
     });
 
     showDialog(
@@ -1688,9 +1679,6 @@ class _UserManagementPageState extends State<UserManagementPage> {
                                       controller: emnameController,
                                       isNumeric: false,
                                       validator: (value) {
-                                        if (value == null || value.isEmpty) {
-                                          return 'Middle name is required';
-                                        }
                                         return null;
                                       })),
                               const SizedBox(width: 10), // Space between fields
@@ -1919,7 +1907,7 @@ class _UserManagementPageState extends State<UserManagementPage> {
                                       ),
                                       child: GestureDetector(
                                         onTap: () {
-                                          _selectDate(context, setState);
+                                          _selectDate(context, setState, _birthday.toString());
                                         },
                                         child: Padding(
                                           padding: const EdgeInsets.fromLTRB(
@@ -2212,6 +2200,10 @@ class _UserManagementPageState extends State<UserManagementPage> {
                                           selectedRegion=null;
                                           _eselectedSex=null;
                                           _birthday=null;
+                                          regions.clear();
+                                          provinces.clear();
+                                          cities.clear();
+                                          barangays.clear();
                                         });
                                         Navigator.pop(
                                             context); // Close the dialog
@@ -2246,9 +2238,12 @@ class _UserManagementPageState extends State<UserManagementPage> {
                                         40, // Set a fixed height for both buttons
                                     child: ElevatedButton(
                                       onPressed: () {
+                                        final regExp = RegExp(
+                                          r'^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$',
+                                        );
                                         if (!_formKey.currentState!.validate())return;
                                         if(econtactNoController.text.isNotEmpty && econtactNoController.text.length ==11){
-                                         if(efnameController.text.isNotEmpty && emnameController.text.isNotEmpty && elnameController.text.isNotEmpty && _birthday != null){
+                                         if(regExp.hasMatch(eemailController.text) && efnameController.text.isNotEmpty && elnameController.text.isNotEmpty && _birthday != null){
                                           showDialog(
                                           context: context,
                                           barrierDismissible: false,
@@ -2343,7 +2338,6 @@ class _UserManagementPageState extends State<UserManagementPage> {
                                                                               items: memberTypeItems,
                                                                               controller: ememberTypeController,
                                                                               onChanged: (selectedItem) {
-                                                                                print(ememberTypeController.text);
                                                                               },
                                                                             ),
                                                               ),
@@ -2672,6 +2666,22 @@ class _UserManagementPageState extends State<UserManagementPage> {
                                                               const SizedBox(
                                                                   width:
                                                                       10),
+                                                              
+                                                              if(efnameController.text!=request['first_name']||
+                                                              emnameController.text!=request['middle_name']||
+                                                              elnameController.text!=request['last_name']||
+                                                              econtactNoController.text!=request['contact_no']||
+                                                              eemailController.text!=request['email_address']||
+                                                              _eselectedSex!=request['sex']||
+                                                              _birthday!=DateTime.parse(request['birth_date'])||
+                                                              ecivilStatusController.text!=request['civil_status']||
+                                                              ehouseAddressController.text !=address ||
+                                                              eregionController.text!=region ||
+                                                              eprovinceController.text!=myProvince ||
+                                                              ecityController.text!=city ||
+                                                              ebarangayController.text!=brgy ||
+                                                              epostalCodeController.text!=postal
+                                                              )
                                                               SizedBox(
                                                                 width:
                                                                     200, // Set a fixed width for both buttons
@@ -3835,7 +3845,7 @@ class _UserManagementPageState extends State<UserManagementPage> {
                                           setState(() {
                                             isDateError=false;
                                           });
-                                          _selectDate(context, setState);
+                                          _selectDate(context, setState, _birthday.toString());
                                         },
                                         child: Padding(
                                           padding: const EdgeInsets.fromLTRB(
