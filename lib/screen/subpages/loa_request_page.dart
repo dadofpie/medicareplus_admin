@@ -1335,7 +1335,7 @@ Future<void> _releasedRequest(String lockedBy, String requestId) async {
                                             child: Row(
                                               mainAxisAlignment:
                                                   MainAxisAlignment
-                                                      .spaceBetween,
+                                                      .end,
                                               children: [
                                                 BlocBuilder<AuthBloc,
                                                     AuthState>(
@@ -1544,7 +1544,8 @@ Future<void> _releasedRequest(String lockedBy, String requestId) async {
                                                             ),
                                                             if (state.adminType ==
                                                           'admin' || state.adminType ==
-                                                          'concierge')
+                                                          'concierge' || state.adminType ==
+                                                          'claims')
                                                             IconButton(
                                                               icon: const Icon(Icons
                                                                   .remove_red_eye_outlined),

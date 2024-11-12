@@ -135,6 +135,67 @@ class _UserManagementPageState extends State<UserManagementPage> {
     _apiService = ApiService(
         'https://medicareplus-api.vercel.app');
     requests = _apiService.streamMembers(supabaseUrl, supabaseKey);
+
+    efnameController.addListener(_onFieldChange);
+    emnameController.addListener(_onFieldChange);
+    elnameController.addListener(_onFieldChange);
+    econtactNoController.addListener(_onFieldChange);
+    eemailController.addListener(_onFieldChange);
+    epasswordController.addListener(_onFieldChange);
+    ehouseAddressController.addListener(_onFieldChange);
+    ebarangayController.addListener(_onFieldChange);
+    ecityController.addListener(_onFieldChange);
+    eprovinceController.addListener(_onFieldChange);
+    epostalCodeController.addListener(_onFieldChange);
+    ebirthdayController.addListener(_onFieldChange);
+    ecivilStatusController.addListener(_onFieldChange);
+    eregionController.addListener(_onFieldChange);
+    euserTypeController.addListener(_onFieldChange);
+    ecardNumberController.addListener(_onFieldChange);
+    ecardTypeController.addListener(_onFieldChange);
+    ememberTypeController.addListener(_onFieldChange);
+    eenrollmentTypeController.addListener(_onFieldChange);
+    eplanTypeController.addListener(_onFieldChange);
+    ebenefitLimitController.addListener(_onFieldChange);
+    ebenefitLimitTypeController.addListener(_onFieldChange);
+    eroomAndBoardTypeController.addListener(_onFieldChange);
+    eroomAndBoardLimitController.addListener(_onFieldChange);
+    
+  }
+
+
+  @override
+  void dispose() {
+    // Dispose of the controllers to avoid memory leaks
+    efnameController.dispose();
+    emnameController.dispose();
+    elnameController.dispose();
+    econtactNoController.dispose();
+    eemailController.dispose();
+    epasswordController.dispose();
+    ehouseAddressController.dispose();
+    ebarangayController.dispose();
+    ecityController.dispose();
+    eprovinceController.dispose();
+    epostalCodeController.dispose();
+    ebirthdayController.dispose();
+    ecivilStatusController.dispose();
+    eregionController.dispose();
+    euserTypeController.dispose();
+    ecardNumberController.dispose();
+    ecardTypeController.dispose();
+    ememberTypeController.dispose();
+    eenrollmentTypeController.dispose();
+    eplanTypeController.dispose();
+    ebenefitLimitController.dispose();
+    ebenefitLimitTypeController.dispose();
+    eroomAndBoardTypeController.dispose();
+    eroomAndBoardLimitController.dispose();
+    super.dispose();
+  }
+
+  void _onFieldChange() {
+    setState(() {});
   }
   
 
@@ -1681,6 +1742,8 @@ class _UserManagementPageState extends State<UserManagementPage> {
                                       value.isNotEmpty &&
                                       !regExp.hasMatch(value)) {
                                     return 'Please enter a valid number';
+                                  }else if(value!.length<11){
+                                    return 'Contact number must be 11 digits';
                                   }
                                   return null;
                                 },
@@ -2182,7 +2245,8 @@ class _UserManagementPageState extends State<UserManagementPage> {
                                     child: ElevatedButton(
                                       onPressed: () {
                                         if (!_formKey.currentState!.validate())return;
-                                        if(efnameController.text.isNotEmpty && emnameController.text.isNotEmpty && elnameController.text.isNotEmpty && _birthday != null){
+                                        if(econtactNoController.text.isNotEmpty && econtactNoController.text.length ==11){
+                                         if(efnameController.text.isNotEmpty && emnameController.text.isNotEmpty && elnameController.text.isNotEmpty && _birthday != null){
                                           showDialog(
                                           context: context,
                                           barrierDismissible: false,
@@ -2605,7 +2669,7 @@ class _UserManagementPageState extends State<UserManagementPage> {
                                                   
                                                               const SizedBox(
                                                                   width:
-                                                                      10), // Add spacing between the buttons
+                                                                      10),
                                                               SizedBox(
                                                                 width:
                                                                     200, // Set a fixed width for both buttons
@@ -2659,6 +2723,7 @@ class _UserManagementPageState extends State<UserManagementPage> {
                                           },
                                         );
                                         }
+                                      }
                                       },
                                       style: ElevatedButton.styleFrom(
                                         shape: RoundedRectangleBorder(
