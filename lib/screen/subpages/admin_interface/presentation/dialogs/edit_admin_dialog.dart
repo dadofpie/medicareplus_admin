@@ -60,6 +60,7 @@ class _EditAdminDialogState extends State<EditAdminDialog> {
     roleController.addListener(_onFieldChange);
     statusController.addListener(_onFieldChange);
     contactNoController.addListener(_onFieldChange);
+    emailController.addListener(_onFieldChange);
   }
 
   @override
@@ -71,6 +72,7 @@ class _EditAdminDialogState extends State<EditAdminDialog> {
     roleController.dispose();
     statusController.dispose();
     contactNoController.dispose();
+    emailController.dispose();
     super.dispose();
   }
 
