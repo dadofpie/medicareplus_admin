@@ -539,6 +539,7 @@ class _UserManagementPageState extends State<UserManagementPage> {
           eroomAndBoardLimitController.text='';
           _isFormValid=true;
           isLoading=false;
+          _birthday=null;
           //fetchLoaRequest();
           Navigator.of(context).popUntil((route) => route.isFirst);
           _showMessage(
@@ -1500,12 +1501,64 @@ class _UserManagementPageState extends State<UserManagementPage> {
     String myProvince=request['province'] ?? '';
     String region=request['region'] ?? '';
     String postal=request['postal_code'] ?? '';
+    String rbl =(selectedCard['mp_card_plan_table'] != null &&
+                selectedCard['mp_card_plan_table'].isNotEmpty)
+            ? selectedCard['mp_card_plan_table'][0]['mp_plan_table']
+                    ['mp_plan_room_boards_table']['rb_amount'].toString() ??
+                "0.0"
+            : '';
+    String bl =(selectedCard['mp_card_plan_table'] != null &&
+                selectedCard['mp_card_plan_table'].isNotEmpty)
+            ? selectedCard['mp_card_plan_table'][0]['mp_plan_table']
+                    ['mp_limit_table']['amount'].toString() ??
+                "0.0"
+            : '';
+    String et = (selectedCard['mp_card_plan_table'] != null &&
+                selectedCard['mp_card_plan_table'].isNotEmpty)
+            ? selectedCard['mp_card_plan_table'][0]['mp_plan_table']['enrollment_type_id'].toString() ??""
+            : '';
+    String pt = selectedCard['card_type'].toString() ?? '4';
+    String rbt = (selectedCard['mp_card_plan_table'] != null &&
+                selectedCard['mp_card_plan_table'].isNotEmpty)
+            ? selectedCard['mp_card_plan_table'][0]['mp_plan_table']
+                    ['mp_plan_room_boards_table']['rb_id'].toString() ??
+                ""
+            : '';
+    String blt =(selectedCard['mp_card_plan_table'] != null &&
+                selectedCard['mp_card_plan_table'].isNotEmpty)
+            ? selectedCard['mp_card_plan_table'][0]['mp_plan_table']
+                    ['mp_limit_table']['lt_id'].toString() ??
+                ""
+            : '';
+    String ld= (selectedCard['mp_card_plan_table'] != null &&
+                selectedCard['mp_card_plan_table'].isNotEmpty)
+            ? selectedCard['mp_card_plan_table'][0]['mp_plan_table']
+                    ['limit_id'].toString() ??
+                ""
+            : '';
+    String pbd= (selectedCard['mp_card_plan_table'] != null &&
+                selectedCard['mp_card_plan_table'].isNotEmpty)
+            ? selectedCard['mp_card_plan_table'][0]['mp_plan_table']
+                    ['prb_id'].toString() ??
+                ""
+            : '';
+    String cid = (selectedCard['mp_card_plan_table'] != null &&
+                selectedCard['mp_card_plan_table'].isNotEmpty)
+            ? selectedCard['mp_card_plan_table'][0]['card_id'].toString() ??
+                ""
+            : '';
+    String pd= (selectedCard['mp_card_plan_table'] != null &&
+                selectedCard['mp_card_plan_table'].isNotEmpty)
+            ? selectedCard['mp_card_plan_table'][0]['plan_id'].toString() ??
+                ""
+            : '';
+    String mail=request['email_address'] ?? '';
     setState(() {
       efnameController.text=request['first_name'];
       emnameController.text=request['middle_name'];
       elnameController.text=request['last_name'];
       econtactNoController.text=request['contact_no'] ?? '';
-      eemailController.text=request['email_address'] ?? '';
+      eemailController.text=mail;
       ememberTypeController.text=request['type_id'].toString();
       _birthday = request['birth_date'] != null ? DateTime.parse(request['birth_date']) : null;
       ecivilStatusController.text = request['civil_status'] ?? '';
@@ -1515,58 +1568,17 @@ class _UserManagementPageState extends State<UserManagementPage> {
       eprovinceController.text=myProvince;
       eregionController.text=region;
       epostalCodeController.text=postal;
-      eroomAndBoardLimitController.text=(selectedCard['mp_card_plan_table'] != null &&
-                selectedCard['mp_card_plan_table'].isNotEmpty)
-            ? selectedCard['mp_card_plan_table'][0]['mp_plan_table']
-                    ['mp_plan_room_boards_table']['rb_amount'].toString() ??
-                "0.0"
-            : '';
-      ebenefitLimitController.text=(selectedCard['mp_card_plan_table'] != null &&
-                selectedCard['mp_card_plan_table'].isNotEmpty)
-            ? selectedCard['mp_card_plan_table'][0]['mp_plan_table']
-                    ['mp_limit_table']['amount'].toString() ??
-                "0.0"
-            : '';
-      eenrollmentTypeController.text=(selectedCard['mp_card_plan_table'] != null &&
-                selectedCard['mp_card_plan_table'].isNotEmpty)
-            ? selectedCard['mp_card_plan_table'][0]['mp_plan_table']['enrollment_type_id'].toString() ??""
-            : '';
-      eplanTypeController.text=selectedCard['card_type'].toString() ?? '4';
-      eroomAndBoardTypeController.text=(selectedCard['mp_card_plan_table'] != null &&
-                selectedCard['mp_card_plan_table'].isNotEmpty)
-            ? selectedCard['mp_card_plan_table'][0]['mp_plan_table']
-                    ['mp_plan_room_boards_table']['rb_id'].toString() ??
-                ""
-            : '';
-      ebenefitLimitTypeController.text=(selectedCard['mp_card_plan_table'] != null &&
-                selectedCard['mp_card_plan_table'].isNotEmpty)
-            ? selectedCard['mp_card_plan_table'][0]['mp_plan_table']
-                    ['mp_limit_table']['lt_id'].toString() ??
-                ""
-            : '';
+      eroomAndBoardLimitController.text=rbl;
+      ebenefitLimitController.text=bl;
+      eenrollmentTypeController.text=et;
+      eplanTypeController.text= pt;
+      eroomAndBoardTypeController.text= rbt;
+      ebenefitLimitTypeController.text=blt;
       customerId = request['id'].toString();
-      limit_id = (selectedCard['mp_card_plan_table'] != null &&
-                selectedCard['mp_card_plan_table'].isNotEmpty)
-            ? selectedCard['mp_card_plan_table'][0]['mp_plan_table']
-                    ['limit_id'].toString() ??
-                ""
-            : '';
-      prb_id = (selectedCard['mp_card_plan_table'] != null &&
-                selectedCard['mp_card_plan_table'].isNotEmpty)
-            ? selectedCard['mp_card_plan_table'][0]['mp_plan_table']
-                    ['prb_id'].toString() ??
-                ""
-            : '';
-      card_id = (selectedCard['mp_card_plan_table'] != null &&
-                selectedCard['mp_card_plan_table'].isNotEmpty)
-            ? selectedCard['mp_card_plan_table'][0]['card_id'].toString() ??
-                ""
-            : '';
-      plan_id  = (selectedCard['mp_card_plan_table'] != null &&
-                selectedCard['mp_card_plan_table'].isNotEmpty)
-            ? selectedCard['mp_card_plan_table'][0]['plan_id'].toString() ??
-                ""
-            : '';
+      limit_id = ld;
+      prb_id = pbd;
+      card_id = cid;
+      plan_id  = pd;
       if (eplanTypeController.text == '4') {
         ecardTypeController.text = 'PSMBFI';
       }
@@ -2238,9 +2250,13 @@ class _UserManagementPageState extends State<UserManagementPage> {
                                         40, // Set a fixed height for both buttons
                                     child: ElevatedButton(
                                       onPressed: () {
-                                        final regExp = RegExp(
+                                        /*final regExp = RegExp(
                                           r'^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$',
+                                        );*/
+                                        final regExp = RegExp(
+                                          r'^\s*$|^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$',
                                         );
+
                                         if (!_formKey.currentState!.validate())return;
                                         if(econtactNoController.text.isNotEmpty && econtactNoController.text.length ==11){
                                          if(regExp.hasMatch(eemailController.text) && efnameController.text.isNotEmpty && elnameController.text.isNotEmpty && _birthday != null){
@@ -2338,6 +2354,9 @@ class _UserManagementPageState extends State<UserManagementPage> {
                                                                               items: memberTypeItems,
                                                                               controller: ememberTypeController,
                                                                               onChanged: (selectedItem) {
+                                                                                setState((){
+                                                                                  ememberTypeController.text=ememberTypeController.text;
+                                                                                });
                                                                               },
                                                                             ),
                                                               ),
@@ -2353,7 +2372,11 @@ class _UserManagementPageState extends State<UserManagementPage> {
                                                                     ),
                                                                     items:enrollmentTypeItems,
                                                                     controller:eenrollmentTypeController,
-                                                                    onChanged:(selectedItem) {},
+                                                                    onChanged:(selectedItem) {
+                                                                      setState((){
+                                                                        eenrollmentTypeController.text=eenrollmentTypeController.text;
+                                                                      });
+                                                                    },
                                                                   ),
                                                                 ),
                                                   
@@ -2367,7 +2390,11 @@ class _UserManagementPageState extends State<UserManagementPage> {
                                                                     ),
                                                                     items:planTypeItems,
                                                                     controller:eplanTypeController,
-                                                                    onChanged:(selectedItem) {},
+                                                                    onChanged:(selectedItem) {
+                                                                      setState((){
+                                                                        eplanTypeController.text=eplanTypeController.text;
+                                                                      });
+                                                                    },
                                                                   ),
                                                               ),
                                                             ],
@@ -2387,7 +2414,11 @@ class _UserManagementPageState extends State<UserManagementPage> {
                                                                     ),
                                                                     items:roomBoardTypeItems,
                                                                     controller:eroomAndBoardTypeController,
-                                                                    onChanged:(selectedItem) {},
+                                                                    onChanged:(selectedItem) {
+                                                                      setState((){
+                                                                        eroomAndBoardTypeController.text=eroomAndBoardTypeController.text;
+                                                                      });
+                                                                    },
                                                                   ),
                                                               ),
                                                               const SizedBox(
@@ -2428,7 +2459,11 @@ class _UserManagementPageState extends State<UserManagementPage> {
                                                                     ),
                                                                     items:benefitTypeItems,
                                                                     controller:ebenefitLimitTypeController,
-                                                                    onChanged:(selectedItem) {},
+                                                                    onChanged:(selectedItem) {
+                                                                      setState((){
+                                                                        ebenefitLimitTypeController.text=ebenefitLimitTypeController.text;
+                                                                      });
+                                                                    },
                                                                   ),
                                                               ),
                                                               const SizedBox(
@@ -2510,7 +2545,6 @@ class _UserManagementPageState extends State<UserManagementPage> {
                                                                   validator:
                                                                       (value) {
                                                                     //return null;
-                                                                    
                                                                   },
                                                                   maxLength: 16,
                                                                 ),
@@ -2671,7 +2705,7 @@ class _UserManagementPageState extends State<UserManagementPage> {
                                                               emnameController.text!=request['middle_name']||
                                                               elnameController.text!=request['last_name']||
                                                               econtactNoController.text!=request['contact_no']||
-                                                              eemailController.text!=request['email_address']||
+                                                              eemailController.text!=mail||
                                                               _eselectedSex!=request['sex']||
                                                               _birthday!=DateTime.parse(request['birth_date'])||
                                                               ecivilStatusController.text!=request['civil_status']||
@@ -2680,7 +2714,13 @@ class _UserManagementPageState extends State<UserManagementPage> {
                                                               eprovinceController.text!=myProvince ||
                                                               ecityController.text!=city ||
                                                               ebarangayController.text!=brgy ||
-                                                              epostalCodeController.text!=postal
+                                                              epostalCodeController.text!=postal ||
+                                                              ememberTypeController.text != request['type_id'].toString() ||
+                                                              eenrollmentTypeController.text != et ||
+                                                              eplanTypeController.text != pt ||
+                                                              eroomAndBoardTypeController.text != rbt ||
+                                                              eroomAndBoardLimitController.text != rbl ||
+                                                              ebenefitLimitTypeController.text != blt
                                                               )
                                                               SizedBox(
                                                                 width:
