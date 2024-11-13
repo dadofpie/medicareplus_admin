@@ -93459,8 +93459,8 @@ if(p==null)p=""
 return B.d.p(p,j.cT)}else if(i==="is_active"){o=J.P(a,"is_active")
 if(o==null)o=!1
 j=j.y2.a.a
-if(j.toLowerCase()==="active")n=J.c(o,!0)
-else n=j.toLowerCase()!=="inactive"||J.c(o,!1)
+if(j.toLowerCase()==="active"||j.toLowerCase()==="act")n=J.c(o,!0)
+else n=!(j.toLowerCase()==="inactive"||j.toLowerCase()==="ina")||J.c(o,!1)
 return n}else if(i==="email"){i=J.P(a,"email_address")
 m=i==null?k:J.pX(i)
 if(m==null)m="n/a"

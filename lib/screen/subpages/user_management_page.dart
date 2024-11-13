@@ -779,9 +779,9 @@ class _UserManagementPageState extends State<UserManagementPage> {
                   bool isActiveMatch = true;
                   
                   // Compare based on the input from the searchController
-                  if (searchController.text.toLowerCase() == 'active') {
+                  if (searchController.text.toLowerCase() == 'active' || searchController.text.toLowerCase() == 'act') {
                     isActiveMatch = isActive == true; // Check if the 'is_active' field is true
-                  } else if (searchController.text.toLowerCase() == 'inactive') {
+                  } else if (searchController.text.toLowerCase() == 'inactive' || searchController.text.toLowerCase() == 'ina') {
                     isActiveMatch = isActive == false; // Check if the 'is_active' field is false
                   }
 
