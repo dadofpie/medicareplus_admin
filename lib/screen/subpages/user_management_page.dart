@@ -373,11 +373,10 @@ class _UserManagementPageState extends State<UserManagementPage> {
           message =
               'Your bulk data upload was successful! All records have been processed and added to the system. Total successes: $successes';
         }
-
+        Navigator.of(context).popUntil((route) => route.isFirst);
         _showMessage(message,
             failures.isNotEmpty ? 'Upload Failed' : 'Upload Successful');
         setState(() {
-          Navigator.of(context).popUntil((route) => route.isFirst);
           _selectedFiles = []; // Clear selected files after upload
           //fetchLoaRequest();
           isLoading = false;
