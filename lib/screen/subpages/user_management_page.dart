@@ -354,7 +354,7 @@ class _UserManagementPageState extends State<UserManagementPage> {
     }
 
     try {
-      var response = await request.send();
+      var response = await request.send().timeout(const Duration(seconds: 10));
 
       if (response.statusCode == 200) {
         final responseData = await http.Response.fromStream(response);
@@ -391,7 +391,16 @@ class _UserManagementPageState extends State<UserManagementPage> {
           isLoading = false;
         });
       }
-    } catch (e) {
+    } on TimeoutException catch (_) {
+      // Handle timeout (e.g., show a timeout message)
+      setState(() {
+        _selectedFiles = []; 
+        isLoading = false;
+        Navigator.of(context).popUntil((route) => route.isFirst);
+        _showMessage('The request timed out. Please try again later.',
+          'Connection timeout!');  
+      });
+    }catch (e) {
       print('Error during file upload: $e');
     }
   }
