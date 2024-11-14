@@ -3846,7 +3846,7 @@ class _UserManagementPageState extends State<UserManagementPage> {
                                     child: Column(
                                       crossAxisAlignment: CrossAxisAlignment.start,
                                       children: [
-                                       if(noSex) 
+                                       /*if(noSex) 
                                        Text(
                                           "Sex is required", // Title for the radio buttons
                                           style: TextStyle(
@@ -3856,7 +3856,7 @@ class _UserManagementPageState extends State<UserManagementPage> {
                                           ),
                                           textAlign:
                                               TextAlign.left, // Align text to the left
-                                        ),
+                                        ),*/
                                         Row(
                                           children: [
                                             const Text(
@@ -4286,10 +4286,9 @@ class _UserManagementPageState extends State<UserManagementPage> {
                                     child: ElevatedButton(
                                       onPressed: () {
                                         if (!_formKey.currentState!.validate())return;
-                                        if(_birthday==null && _selectedSex==null){
+                                        if(_birthday==null){
                                           setState(() {
                                             isDateError=true;
-                                            noSex=true;
                                             dateLabel='Birthday is required';
                                           });
                                         }else{
@@ -4302,7 +4301,7 @@ class _UserManagementPageState extends State<UserManagementPage> {
                                               dateLabel='Invalid date; age must be 16 or older.';
                                             });
                                           }else{
-                                            if(fnameController.text.isNotEmpty && lnameController.text.isNotEmpty&&_birthday!=null && _selectedSex!=null){
+                                            if(fnameController.text.isNotEmpty && lnameController.text.isNotEmpty&&_birthday!=null){
                                                 setState(() {
                                                   isDateError=false;
                                                   noSex=false;
