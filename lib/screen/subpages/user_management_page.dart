@@ -377,6 +377,7 @@ class _UserManagementPageState extends State<UserManagementPage> {
         _showMessage(message,
             failures.isNotEmpty ? 'Upload Failed' : 'Upload Successful');
         setState(() {
+          Navigator.of(context).popUntil((route) => route.isFirst);
           _selectedFiles = []; // Clear selected files after upload
           //fetchLoaRequest();
           isLoading = false;
