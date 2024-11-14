@@ -512,7 +512,7 @@ class _UserManagementPageState extends State<UserManagementPage> {
           'supabase-key': supabaseKey,
         },
         body: json.encode(data),
-      );
+      ).timeout(const Duration(seconds: 10));
 
       if (response.statusCode == 200) {
         final responseData = json.decode(response.body);
@@ -556,6 +556,36 @@ class _UserManagementPageState extends State<UserManagementPage> {
         _showMessage(errorData['error'], 'Error');
         // Show error message
       }
+    } on TimeoutException catch (_) {
+      // Handle timeout (e.g., show a timeout message)
+      setState(() {
+        efnameController.text = '';
+          elnameController.text = '';
+          emnameController.text = '';
+          econtactNoController.text = '';
+          eemailController.text = '';
+          epasswordController.text = '';
+          ehouseAddressController.text = '';
+          ebarangayController.text = '';
+          ecityController.text = '';
+          eprovinceController.text = '';
+          epostalCodeController.text = '';
+          ebirthdayController.text = '';
+          ecivilStatusController.text = '';
+          eregionController.text = '';
+          ecardNumberController.text = '';
+          ecardTypeController.text = '';
+          _eselectedSex='';
+          ebenefitLimitController.text='';
+          eroomAndBoardLimitController.text='';
+          _isFormValid=true;
+          isLoading=false;
+          _birthday=null;
+        Navigator.of(context).popUntil((route) => route.isFirst);
+        _showMessage('The request timed out. Please try again later.',
+          'Connection timeout!');  
+      });
+      
     } catch (error) {
       setState(() {
           isLoading=false;
@@ -610,7 +640,7 @@ class _UserManagementPageState extends State<UserManagementPage> {
           'supabase-key': supabaseKey,
         },
         body: json.encode(data),
-      );
+      ).timeout(const Duration(seconds: 10));
 
       if (response.statusCode == 200) {
         final responseData = json.decode(response.body);
@@ -653,6 +683,34 @@ class _UserManagementPageState extends State<UserManagementPage> {
         _showMessage(errorData['error'], 'Error');
         // Show error message
       }
+    } on TimeoutException catch (_) {
+      // Handle timeout (e.g., show a timeout message)
+      setState(() {
+        fnameController.text = '';
+          lnameController.text = '';
+          mnameController.text = '';
+          contactNoController.text = '';
+          emailController.text = '';
+          passwordController.text = '';
+          houseAddressController.text = '';
+          barangayController.text = '';
+          cityController.text = '';
+          provinceController.text = '';
+          postalCodeController.text = '';
+          birthdayController.text = '';
+          civilStatusController.text = '';
+          regionController.text = '';
+          cardNumberController.text = '';
+          cardTypeController.text = '';
+          benefitLimitController.text='';
+          roomAndBoardLimitController.text='';
+          _selectedSex=null;
+          _birthday=null;
+          isLoading=false;
+          Navigator.of(context).popUntil((route) => route.isFirst);
+          _showMessage('The request timed out. Please try again later.',
+              'Connection timeout!');
+      });
     } catch (error) {
       setState(() {
           isLoading=false;

@@ -289,7 +289,7 @@ Future<void> _releasedRequest(String lockedBy, String requestId) async {
       return false;
     }*/
     try {
-      var response = await request.send();
+      var response = await request.send().timeout(const Duration(seconds: 10));
 
       if (response.statusCode == 200) {
         final responseData = await response.stream.bytesToString();
@@ -313,6 +313,15 @@ Future<void> _releasedRequest(String lockedBy, String requestId) async {
         }
         return false;
       }
+    } on TimeoutException catch (_) {
+      // Handle timeout (e.g., show a timeout message)
+      setState(() {
+        Navigator.of(context).popUntil((route) => route.isFirst);
+        _showMessage('The request timed out. Please try again later.',
+          'Connection timeout!');  
+      });
+      return false;
+      
     } catch (e) {
       print('Error occurred while updating: $e');
       return false;

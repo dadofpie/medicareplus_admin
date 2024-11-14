@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:convert';
 
 import 'package:flutter/material.dart';
@@ -398,7 +399,7 @@ class _EditAdminDialogState extends State<EditAdminDialog> {
                                     Uri.parse(url),
                                     headers: headers,
                                     body: jsonEncode(body),
-                                  );
+                                  ).timeout(const Duration(seconds: 10));
                         
                                   if (response.statusCode == 200) {
                                     final data = jsonDecode(response.body);
@@ -420,7 +421,20 @@ class _EditAdminDialogState extends State<EditAdminDialog> {
                                     _isLoading=false;
                                     _showMessage('Update failed. Please try again.','Error');
                                   }
-                                } catch (e) {
+                                }  on TimeoutException catch (_) {
+                                  // Handle timeout (e.g., show a timeout message)
+                                    roleController.text = '';
+                                    fnameController.text = '';
+                                    mnameController.text = '';
+                                    lnameController.text = '';
+                                    emailController.text = '';
+                                    contactNoController.text = '';
+                                    roleController.text = '';
+                                  _isLoading = false;
+                                  Navigator.of(context).popUntil((route) => route.isFirst);
+                                  context.read<AdminBloc>().add(FetchAdminAccountsEvent());
+                                  _showMessage('The request timed out. Please try again later.', 'Connection timeout!');
+                                }catch (e) {
                                   // Handle unexpected errors
                                   _isLoading=false;
                                   ScaffoldMessenger.of(context).showSnackBar(
