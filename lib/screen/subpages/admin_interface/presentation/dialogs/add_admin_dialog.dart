@@ -486,6 +486,7 @@ void _showMessage(String message, String title) {
                                   contactNoController.text = '';
                                   roleController.text = '';
                                 _isLoading = false;
+                                Navigator.of(context).popUntil((route) => route.isFirst);
                                 context.read<AdminBloc>().add(FetchAdminAccountsEvent());
                                 _showMessage('The request timed out. Please try again later.', 'Connection timeout!');
                               } catch (e) {
