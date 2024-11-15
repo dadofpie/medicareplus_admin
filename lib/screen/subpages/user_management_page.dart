@@ -177,7 +177,7 @@ class _UserManagementPageState extends State<UserManagementPage> {
   
 
   Future<void> fetchRegions(StateSetter setState) async {
-    var apiUrl = '$ggxUrl/countries/PH/regions';
+    var apiUrl = '$ggxUrl/v2/locations/countries/PH/regions';
 
     var jwt = ggx.generateJwt();
   final response = await http.get(Uri.parse(apiUrl),
@@ -242,7 +242,7 @@ class _UserManagementPageState extends State<UserManagementPage> {
 
 
   Future<void> fetchProvinces(String regionCode, StateSetter setState) async {
-    var apiUrl = '$ggxUrl/regions/$regionCode/provinces';
+    var apiUrl = '$ggxUrl/v2/locations/regions/$regionCode/provinces';
 
     var jwt = ggx.generateJwt();
     final response = await http.get(Uri.parse(apiUrl),
@@ -266,7 +266,7 @@ class _UserManagementPageState extends State<UserManagementPage> {
 
   Future<void> fetchCities(String provinceCode, StateSetter setState) async {
 
-      var apiUrl = '$ggxUrl/provinces/$provinceCode/cities';
+      var apiUrl = '$ggxUrl/v2/locations/provinces/$provinceCode/cities';
 
       var jwt = ggx.generateJwt();
       final response = await http.get(Uri.parse(apiUrl),
@@ -288,8 +288,8 @@ class _UserManagementPageState extends State<UserManagementPage> {
     
   }
 
-  Future<void> fetchBarangays(String cityCode, StateSetter setState) async {
-    var apiUrl = '$ggxUrl/cities/$cityCode/districts';
+  /*Future<void> fetchBarangays(String cityCode, StateSetter setState) async {
+    var apiUrl = '$ggxUrl/v2/locations/cities/$cityCode/districts';
 
       var jwt = ggx.generateJwt();
       final response = await http.get(Uri.parse(apiUrl),
@@ -305,7 +305,44 @@ class _UserManagementPageState extends State<UserManagementPage> {
         barangays = regionsJson.map((e) => Barangay.fromJson(e)).toList();
       });
     }
+  }*/
+
+  Future<void> fetchBarangays(String cityCode, StateSetter setState) async {
+  var apiUrl = '$ggxUrl/v2/locations/cities/$cityCode/districts';
+
+  var jwt = ggx.generateJwt();
+  List<Barangay> allBarangays = [];
+
+  while (apiUrl != '') {
+    // Fetch the data from the API
+    final response = await http.get(Uri.parse(apiUrl), headers: {
+      'Content-Type': 'application/json',
+      'Authorization': 'Bearer $jwt',
+    });
+
+    // If the response is successful (status code 200), parse the data
+    if (response.statusCode == 200) {
+      final Map<String, dynamic> data = json.decode(response.body);
+      final List<dynamic> regionsJson = data['data'];
+
+      // Add the current page of barangays to the allBarangays list
+      allBarangays.addAll(regionsJson.map((e) => Barangay.fromJson(e)).toList());
+
+      // Check if there is a next page and update the apiUrl
+      apiUrl = data['next_page_url'] != null ? '$ggxUrl${data['next_page_url']}' : '';
+    } else {
+      // If the response is not successful, break the loop (you can also handle the error accordingly)
+      print('Error fetching data: ${response.statusCode}');
+      break;
+    }
   }
+
+  // Once all pages are fetched, update the state with all the barangays
+  setState(() {
+    barangays = allBarangays;
+  });
+}
+
 
   Future<void> _pickFiles(StateSetter setState) async {
     try {

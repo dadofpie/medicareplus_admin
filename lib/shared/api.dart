@@ -4,6 +4,6 @@ const apiUrl = 'https://medicareplus-api.vercel.app/api/admin';
 
 
 
-const ggxUrl = 'https://api.staging.quadx.xyz/v2/locations';
+const ggxUrl = 'https://api.staging.quadx.xyz';
 const secretKey = 'b446261ed0e6879f3b6f1adf4d582d4f';
 const ggxApiKey = '187926583f08b52845';
