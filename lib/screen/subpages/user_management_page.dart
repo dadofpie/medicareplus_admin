@@ -12,6 +12,7 @@ import 'package:medicare_admin_remaster/bloc/auth/auth_bloc.dart';
 import 'package:medicare_admin_remaster/class/address.dart';
 import 'package:medicare_admin_remaster/class/loa_request.dart';
 import 'package:medicare_admin_remaster/class/status_item.dart';
+import 'package:medicare_admin_remaster/services/ggx_connection.dart';
 import 'package:medicare_admin_remaster/shared/api.dart';
 import 'package:medicare_admin_remaster/shared/list.dart';
 import 'package:medicare_admin_remaster/widget/address_dropdown.dart';
@@ -46,6 +47,8 @@ class _UserManagementPageState extends State<UserManagementPage> {
   String? prb_id;
   String? card_id;
   String? plan_id;
+
+  GgxApi ggx= GgxApi();
 
   String? selectedRegion;
   String? selectedProvince;
@@ -132,6 +135,7 @@ class _UserManagementPageState extends State<UserManagementPage> {
   void initState() {
     super.initState();
     //fetchLoaRequest();
+    fetchRegions(setState);
     _apiService = ApiService(
         'https://medicareplus-api.vercel.app');
     requests = _apiService.streamMembers(supabaseUrl, supabaseKey);
@@ -172,22 +176,30 @@ class _UserManagementPageState extends State<UserManagementPage> {
   }*/
   
 
-  Future<void> fetchRegions() async {
-  final response = await http.get(Uri.parse('https://psgc.gitlab.io/api/regions.json'));
+  Future<void> fetchRegions(StateSetter setState) async {
+    var apiUrl = '$ggxUrl/countries/PH/regions';
+
+    var jwt = ggx.generateJwt();
+  final response = await http.get(Uri.parse(apiUrl),
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': 'Bearer $jwt',
+        });
 
   if (response.statusCode == 200) {
-    final List<dynamic> data = json.decode(response.body);
+    final Map<String, dynamic> data = json.decode(response.body);
+    final List<dynamic> regionsJson = data['data'];
 
     // Sort the regions with custom logic
-    data.sort((a, b) {
+    regionsJson.sort((a, b) {
       // Define the custom order
       const customOrder = [
-        'National Capital Region',
+        'NCR',
         'Region I',
         'Region II',
         'Region III',
         'Region IV-A', // Region IV-A
-        'MIMAROPA Region', // Place MIMAROPA after CALABARZON
+        'Region IV-B', // Place MIMAROPA after CALABARZON
         'Region V',
         'Region VI',
         'Region VII',
@@ -197,12 +209,14 @@ class _UserManagementPageState extends State<UserManagementPage> {
         'Region XI',
         'Region XII',
         'Region XIII',
-        'Cordillera Administrative Region',
-        'Bangsamoro Autonomous Region in Muslim Mindanao',
+        'CAR',
+        'ARMM',
+        'NIR',
+        'Davao de Oro'
       ];
 
-      int indexA = customOrder.indexOf(a['regionName']);
-      int indexB = customOrder.indexOf(b['regionName']);
+      int indexA = customOrder.indexOf(a['name']);
+      int indexB = customOrder.indexOf(b['name']);
 
       // If both items are in customOrder, sort by their indices
       if (indexA != -1 && indexB != -1) {
@@ -214,11 +228,11 @@ class _UserManagementPageState extends State<UserManagementPage> {
       if (indexB != -1) return 1;
 
       // Default sorting (alphabetical) for other regions
-      return a['regionName'].compareTo(b['regionName']);
+      return a['name'].compareTo(b['name']);
     });
 
     setState(() {
-      regions = data.map((e) => Region.fromJson(e)).toList();
+      regions = regionsJson.map((e) => Region.fromJson(e)).toList();
     });
   } else {
     throw Exception('Failed to load regions');
@@ -228,11 +242,21 @@ class _UserManagementPageState extends State<UserManagementPage> {
 
 
   Future<void> fetchProvinces(String regionCode, StateSetter setState) async {
-    final response = await http.get(Uri.parse('https://psgc.gitlab.io/api/regions/$regionCode/provinces.json'));
+    var apiUrl = '$ggxUrl/regions/$regionCode/provinces';
+
+    var jwt = ggx.generateJwt();
+    final response = await http.get(Uri.parse(apiUrl),
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': 'Bearer $jwt',
+        });
+    //final response = await http.get(Uri.parse('https://psgc.gitlab.io/api/regions/$regionCode/provinces.json'));
     if (response.statusCode == 200) {
-      final List<dynamic> data = json.decode(response.body);
+      
+      final Map<String, dynamic> data = json.decode(response.body);
+      final List<dynamic> regionsJson = data['data'];
       setState(() {
-        provinces = data.map((e) => Province.fromJson(e)).toList();
+        provinces = regionsJson.map((e) => Province.fromJson(e)).toList();
         selectedProvince = null; // Reset province selection
         cities.clear(); // Clear cities
         barangays.clear(); // Clear barangays
@@ -241,38 +265,44 @@ class _UserManagementPageState extends State<UserManagementPage> {
   }
 
   Future<void> fetchCities(String provinceCode, StateSetter setState) async {
-    if(provinceCode!='130000000'){
-      final response = await http.get(Uri.parse('https://psgc.gitlab.io/api/provinces/$provinceCode/cities-municipalities.json'));
+
+      var apiUrl = '$ggxUrl/provinces/$provinceCode/cities';
+
+      var jwt = ggx.generateJwt();
+      final response = await http.get(Uri.parse(apiUrl),
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': 'Bearer $jwt',
+          });
+    
+      //final response = await http.get(Uri.parse('https://psgc.gitlab.io/api/provinces/$provinceCode/cities-municipalities.json'));
       if (response.statusCode == 200) {
-        final decodedBody = utf8.decode(response.bodyBytes);
-        final List<dynamic> data = json.decode(decodedBody);
+        final Map<String, dynamic> data = json.decode(response.body);
+        final List<dynamic> regionsJson = data['data'];
         setState(() {
-          cities = data.map((e) => City.fromJson(e)).toList();
+          cities = regionsJson.map((e) => City.fromJson(e)).toList();
           selectedCity = null; // Reset city selection
           barangays.clear(); // Clear barangays
         });
       }
-    }else{
-      final response = await http.get(Uri.parse('https://psgc.gitlab.io/api/regions/$provinceCode/cities-municipalities.json'));
-      if (response.statusCode == 200) {
-        final decodedBody = utf8.decode(response.bodyBytes);
-        final List<dynamic> data = json.decode(decodedBody);
-        setState(() {
-          cities = data.map((e) => City.fromJson(e)).toList();
-          selectedCity = null; // Reset city selection
-          barangays.clear(); // Clear barangays
-        });
-      }
-    }
+    
   }
 
   Future<void> fetchBarangays(String cityCode, StateSetter setState) async {
-    final response = await http.get(Uri.parse('https://psgc.gitlab.io/api/cities-municipalities/$cityCode/barangays.json'));
+    var apiUrl = '$ggxUrl/cities/$cityCode/districts';
+
+      var jwt = ggx.generateJwt();
+      final response = await http.get(Uri.parse(apiUrl),
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': 'Bearer $jwt',
+          });
+    //final response = await http.get(Uri.parse('https://psgc.gitlab.io/api/cities-municipalities/$cityCode/barangays.json'));
     if (response.statusCode == 200) {
-      final decodedBody = utf8.decode(response.bodyBytes);
-      final List<dynamic> data = json.decode(decodedBody);
+      final Map<String, dynamic> data = json.decode(response.body);
+        final List<dynamic> regionsJson = data['data'];
       setState(() {
-        barangays = data.map((e) => Barangay.fromJson(e)).toList();
+        barangays = regionsJson.map((e) => Barangay.fromJson(e)).toList();
       });
     }
   }
@@ -970,7 +1000,7 @@ class _UserManagementPageState extends State<UserManagementPage> {
                                                   return ElevatedButton(
                                   onPressed: () {
                                     setState(() {
-                                      fetchRegions();
+                                      fetchRegions(setState);
                                     });
                                     _showDialog(context, setState);
                                   },
@@ -1449,27 +1479,38 @@ class _UserManagementPageState extends State<UserManagementPage> {
                                                             Icons.edit), // Edit icon
                                                         onPressed: () {
                                                           setState(() {
-                                                            fetchRegions();
-                                                            if(eregionController.text.isNotEmpty){
-                                                              selectedRegion=regions.firstWhere(
-                                                                (region) => region.regionName == eregionController.text,
+                                                              // Set selectedRegion
+                                                              selectedRegion = regions.firstWhere(
+                                                                (region) => region.regionName == request['region'],
                                                                 orElse: () => Region(code: '', regionName: 'Not Found'),
                                                               ).code;
-                                                              fetchProvinces(selectedRegion!, setState);
-                                                              selectedProvince=provinces.firstWhere(
-                                                                (province) => province.name == eprovinceController.text,
+
+                                                              // Set selectedProvince
+                                                              selectedProvince = provinces.firstWhere(
+                                                                (province) => province.name == request['province'],
                                                                 orElse: () => Province(code: '', name: 'Not Found'),
                                                               ).code;
-                                                              fetchCities(selectedProvince!, setState);
-                                                              selectedCity=cities.firstWhere(
-                                                                (city) => city.name == ecityController.text,
+
+                                                              // Set selectedCity
+                                                              selectedCity = cities.firstWhere(
+                                                                (city) => city.name == request['city'],
                                                                 orElse: () => City(code: '', name: 'Not Found'),
                                                               ).code;
+                                                              
+                                                            
+                                                            });
+
+                                                            // After setState completes, fetch the provinces and other data
+                                                            WidgetsBinding.instance.addPostFrameCallback((_)async {
+                                                              // Now that the state is updated, fetch provinces, cities, and barangays
+                                                              await fetchProvinces(selectedRegion!, setState);
+                                                              await fetchCities(selectedProvince!, setState);
                                                               fetchBarangays(selectedCity!, setState);
-                                                            }
-            
-                                                          });
-                                                          _showDialogEdit(context, request);
+
+                                                              print(provinces);  // For debugging
+                                                            });
+
+                                                          _showDialogEdit(context, request, setState);
                                                         },
                                                         tooltip:
                                                             'Edit', // Optional tooltip
@@ -1484,8 +1525,9 @@ class _UserManagementPageState extends State<UserManagementPage> {
                                                             Icons.edit), // Edit icon
                                                         onPressed: () {
                                                           setState(() {
-                                                            fetchRegions();
-                                                            if(eregionController.text.isNotEmpty){
+                                                            
+                                                           if(eregionController.text.isNotEmpty){
+                                                            fetchRegions(setState);
                                                               selectedRegion=regions.firstWhere(
                                                                 (region) => region.regionName == eregionController.text,
                                                                 orElse: () => Region(code: '', regionName: 'Not Found'),
@@ -1504,7 +1546,7 @@ class _UserManagementPageState extends State<UserManagementPage> {
                                                             }
             
                                                           });
-                                                          _showDialogEdit(context, request);
+                                                          _showDialogEdit(context, request, setState);
                                                         },
                                                         tooltip:
                                                             'Edit', // Optional tooltip
@@ -1549,24 +1591,19 @@ class _UserManagementPageState extends State<UserManagementPage> {
     );
   }
 
-  void _showDialogEdit(BuildContext context, final request) {
+  void _showDialogEdit(BuildContext context, final request, StateSetter setState) {
     final customerType = request['mp_customer_type_table']
                             ?['customer_type'] ??
                         'N/A';
     var cardTable = request['mp_card_table'][0];
     var selectedCard = cardTable;
-      if (request['sex'] ==null) {
-        _eselectedSex = '';
-      }else{
-        _eselectedSex = request['sex'];
-      }
-    
+    _eselectedSex = request['sex'] ?? '';
     bool hasChange=false;
     String address=request['address'] ?? '';
     String brgy=request['barangay'] ?? '';
     String city=request['city'] ?? '';
     String myProvince=request['province'] ?? '';
-    String region=request['region'] ?? '';
+    String myRegion=request['region'] ?? '';
     String postal=request['postal_code'] ?? '';
     String rbl =(selectedCard['mp_card_plan_table'] != null &&
                 selectedCard['mp_card_plan_table'].isNotEmpty)
@@ -1633,7 +1670,7 @@ class _UserManagementPageState extends State<UserManagementPage> {
       ebarangayController.text=brgy;
       ecityController.text=city;
       eprovinceController.text=myProvince;
-      eregionController.text=region;
+      eregionController.text=myRegion;
       epostalCodeController.text=postal;
       eroomAndBoardLimitController.text=rbl;
       ebenefitLimitController.text=bl;
@@ -1650,7 +1687,7 @@ class _UserManagementPageState extends State<UserManagementPage> {
         ecardTypeController.text = 'PSMBFI';
       }
       ecardNumberController.text = selectedCard['card_number'];
-
+      
     });
 
     showDialog(
@@ -2076,22 +2113,18 @@ class _UserManagementPageState extends State<UserManagementPage> {
                               Expanded(
                                 child: CustomDropdown<Region>(
                                     items: regions,
-                                    itemAsString: (region) => region.regionName=='MIMAROPA Region'?'Region IV-B':region.regionName,
+                                    itemAsString: (region) =>region.regionName,
                                     hintText: 'Select Region',
                                     selectedItem: regions.firstWhere(
-                                      (region) => region.regionName == eregionController.text || 
-                                                  (region.code == selectedRegion && region.regionName != eregionController.text),
+                                      (region) => region.regionName == myRegion || 
+                                                  (region.code == selectedRegion && region.regionName != myRegion),
                                       orElse: () => Region(code: '', regionName: 'Select Region'),
                                     ),
                                     onChanged: (Region? newValue) {
                                       setState(() {
                                         selectedRegion = newValue?.code;
                                         eregionController.text=newValue!.regionName;
-                                        if(selectedRegion!='130000000'){
-                                          fetchProvinces(selectedRegion!, setState);
-                                        }else{
-                                          fetchCities('130000000', setState);
-                                        }
+                                        fetchProvinces(selectedRegion!, setState);
                                         provinces.clear(); // Clear previous provinces
                                         cities.clear(); // Clear previous cities
                                         barangays.clear(); // Clear previous barangays
@@ -2204,12 +2237,13 @@ class _UserManagementPageState extends State<UserManagementPage> {
                                   selectedItem: barangays.firstWhere(
                                       (brgy) => brgy.name == ebarangayController.text || 
                                                   (brgy.code == selectedBarangay && brgy.name != ebarangayController.text),
-                                      orElse: () => Barangay(code: '', name: 'Select Barangay'),
+                                      orElse: () => Barangay(code: '', name: 'Select Barangay',postal: ''),
                                     ),
                                   onChanged: (Barangay? newValue) {
                                     setState(() {
                                       selectedBarangay = newValue?.code;
                                       ebarangayController.text=newValue!.name;
+                                      epostalCodeController.text=newValue.postal;
                                     });
                                   },
                                 ),
@@ -2276,13 +2310,13 @@ class _UserManagementPageState extends State<UserManagementPage> {
                                           ebenefitLimitController.text='';
                                           eroomAndBoardLimitController.text='';
                                           _isFormValid=true;
-                                          selectedRegion=null;
+                                          //selectedRegion=null;
                                           _eselectedSex=null;
                                           _birthday=null;
-                                          regions.clear();
+                                          /*regions.clear();
                                           provinces.clear();
                                           cities.clear();
-                                          barangays.clear();
+                                          barangays.clear();*/
                                         });
                                         Navigator.pop(
                                             context); // Close the dialog
@@ -2777,7 +2811,7 @@ class _UserManagementPageState extends State<UserManagementPage> {
                                                               _birthday!=DateTime.parse(request['birth_date'])||
                                                               ecivilStatusController.text!=request['civil_status']||
                                                               ehouseAddressController.text !=address ||
-                                                              eregionController.text!=region ||
+                                                              eregionController.text!=myRegion ||
                                                               eprovinceController.text!=myProvince ||
                                                               ecityController.text!=city ||
                                                               ebarangayController.text!=brgy ||
@@ -4043,7 +4077,7 @@ class _UserManagementPageState extends State<UserManagementPage> {
                               Expanded(
                                 child: CustomDropdown<Region>(
                                     items: regions,
-                                    itemAsString: (region) => region.regionName=='MIMAROPA Region'?'Region IV-B':region.regionName,
+                                    itemAsString: (region) => region.regionName,
                                     hintText: 'Select Region',
                                     selectedItem: regions.firstWhere(
                                       (region) => region.code == selectedRegion,
@@ -4053,11 +4087,7 @@ class _UserManagementPageState extends State<UserManagementPage> {
                                       setState(() {
                                         selectedRegion = newValue?.code;
                                         eregionController.text=newValue!.regionName;
-                                        if(selectedRegion!='130000000'){
-                                          fetchProvinces(selectedRegion!, setState);
-                                        }else{
-                                          fetchCities('130000000', setState);
-                                        }
+                                        fetchProvinces(selectedRegion!, setState);
                                         provinces.clear(); // Clear previous provinces
                                         cities.clear(); // Clear previous cities
                                         barangays.clear(); // Clear previous barangays
@@ -4165,13 +4195,13 @@ class _UserManagementPageState extends State<UserManagementPage> {
                                   hintText: 'Select Barangay',
                                   selectedItem: barangays.firstWhere(
                                     (brgy) => brgy.code == selectedBarangay,
-                                    orElse: () => Barangay(code: '', name: 'Select Barangay'),
+                                    orElse: () => Barangay(code: '', name: 'Select Barangay',postal: ''),
                                   ),
                                   onChanged: (Barangay? newValue) {
                                     setState(() {
                                       selectedBarangay = newValue?.code;
                                       barangayController.text=newValue!.name;
-                                      print(barangayController.text);
+                                      postalCodeController.text=newValue.postal;
                                     });
                                   },
                                 ),

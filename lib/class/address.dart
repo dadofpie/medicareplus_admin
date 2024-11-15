@@ -6,8 +6,8 @@ class Region {
 
   factory Region.fromJson(Map<String, dynamic> json) {
     return Region(
-      code: json['code'],
-      regionName: json['regionName'],
+      code: json['id'].toString(),
+      regionName: json['name'],
     );
   }
 }
@@ -20,7 +20,7 @@ class Province {
 
   factory Province.fromJson(Map<String, dynamic> json) {
     return Province(
-      code: json['code'],
+      code: json['id'].toString(),
       name: json['name'],
     );
   }
@@ -34,7 +34,7 @@ class City {
 
   factory City.fromJson(Map<String, dynamic> json) {
     return City(
-      code: json['code'],
+      code: json['id'].toString(),
       name: json['name'],
     );
   }
@@ -43,13 +43,15 @@ class City {
 class Barangay {
   final String code;
   final String name;
+  final String postal;
 
-  Barangay({required this.code, required this.name});
+  Barangay({required this.code, required this.name, required this.postal});
 
   factory Barangay.fromJson(Map<String, dynamic> json) {
     return Barangay(
-      code: json['code'],
+      code: json['id'].toString(),
       name: json['name'],
+      postal:json['postal_code']
     );
   }
 }
