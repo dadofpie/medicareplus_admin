@@ -127,6 +127,7 @@ class _UserManagementPageState extends State<UserManagementPage> {
   String filterCriteria = '';
   // Sample data
   late Stream<List<Map<String, dynamic>>> requests;
+  late Stream<List<Map<String, dynamic>>> memberData;
   List<PlatformFile> _selectedFiles = [];
 
   bool _isFormValid = true; // State variable to track form validity
@@ -1558,8 +1559,11 @@ class _UserManagementPageState extends State<UserManagementPage> {
                                                                await fetchCities(selectedProvince!, setState);
                                                                await fetchBarangays(selectedCity!, setState);  // For debugging
                                                             });*/
+                                                            var myApiUrl='https://medicareplus-api.vercel.app';
+                                                            List<Map<String, dynamic>> members = await ApiService(myApiUrl).getMemberById(request['id'], supabaseUrl, supabaseKey);
+                                                            //print(members[0]['mp_customer_type_table']['customer_type']);
 
-                                                          _showDialogEdit(context, request, setState);
+                                                            _showDialogEdit(context, members, setState);
                                                         },
                                                         tooltip:
                                                             'Edit', // Optional tooltip
@@ -1572,7 +1576,7 @@ class _UserManagementPageState extends State<UserManagementPage> {
                                                       IconButton(
                                                         icon: const Icon(
                                                             Icons.edit), // Edit icon
-                                                        onPressed: () {
+                                                        onPressed: () async {
                                                           setState(() {
                                                             
                                                            if(eregionController.text.isNotEmpty){
@@ -1595,7 +1599,9 @@ class _UserManagementPageState extends State<UserManagementPage> {
                                                             }
             
                                                           });
-                                                          _showDialogEdit(context, request, setState);
+                                                          var myApiUrl='https://medicareplus-api.vercel.app';
+                                                          List<Map<String, dynamic>> members = await ApiService(myApiUrl).getMemberById(request['id'], supabaseUrl, supabaseKey);
+                                                          _showDialogEdit(context, members, setState);
                                                         },
                                                         tooltip:
                                                             'Edit', // Optional tooltip
@@ -1612,8 +1618,10 @@ class _UserManagementPageState extends State<UserManagementPage> {
                                           IconButton(
                                             icon: const Icon(
                                                 Icons.more_vert), // Three-dot icon
-                                            onPressed: () {
-                                              showDetails(context,request);
+                                            onPressed: () async {
+                                              var myApiUrl='https://medicareplus-api.vercel.app';
+                                              List<Map<String, dynamic>> members = await ApiService(myApiUrl).getMemberById(request['id'], supabaseUrl, supabaseKey);
+                                              showDetails(context,members);
                                             },
                                             tooltip:
                                                 'More Options', // Optional tooltip
@@ -1703,19 +1711,19 @@ Future<String> getCityId(String provinceId, String cityName) async {
 }
 
   void _showDialogEdit(BuildContext context, final request, StateSetter setState) {
-    final customerType = request['mp_customer_type_table']
+    final customerType = request[0]['mp_customer_type_table']
                             ?['customer_type'] ??
                         'N/A';
-    var cardTable = request['mp_card_table'][0];
+    var cardTable = request[0]['mp_card_table'][0];
     var selectedCard = cardTable;
-    _eselectedSex = request['sex'] ?? '';
+    _eselectedSex = request[0]['sex'] ?? '';
     bool hasChange=false;
-    String address=request['address'] ?? '';
-    String brgy=request['barangay'] ?? '';
-    String city=request['city'] ?? '';
-    String myProvince=request['province'] ?? '';
-    String myRegion=request['region'] ?? '';
-    String postal=request['postal_code'] ?? '';
+    String address=request[0]['address'] ?? '';
+    String brgy=request[0]['barangay'] ?? '';
+    String city=request[0]['city'] ?? '';
+    String myProvince=request[0]['province'] ?? '';
+    String myRegion=request[0]['region'] ?? '';
+    String postal=request[0]['postal_code'] ?? '';
     String rbl =(selectedCard['mp_card_plan_table'] != null &&
                 selectedCard['mp_card_plan_table'].isNotEmpty)
             ? selectedCard['mp_card_plan_table'][0]['mp_plan_table']
@@ -1767,16 +1775,16 @@ Future<String> getCityId(String provinceId, String cityName) async {
             ? selectedCard['mp_card_plan_table'][0]['plan_id'].toString() ??
                 ""
             : '';
-    String mail=request['email_address'] ?? '';
+    String mail=request[0]['email_address'] ?? '';
     setState(() {
-      efnameController.text=request['first_name'];
-      emnameController.text=request['middle_name'] ?? '';
-      elnameController.text=request['last_name'];
-      econtactNoController.text=request['contact_no'] ?? '';
+      efnameController.text=request[0]['first_name'];
+      emnameController.text=request[0]['middle_name'] ?? '';
+      elnameController.text=request[0]['last_name'];
+      econtactNoController.text=request[0]['contact_no'] ?? '';
       eemailController.text=mail;
-      ememberTypeController.text=request['type_id'].toString();
-      _birthday = request['birth_date'] != null ? DateTime.parse(request['birth_date']) : null;
-      ecivilStatusController.text = request['civil_status'] ?? '';
+      ememberTypeController.text=request[0]['type_id'].toString();
+      _birthday = request[0]['birth_date'] != null ? DateTime.parse(request[0]['birth_date']) : null;
+      ecivilStatusController.text = request[0]['civil_status'] ?? '';
       ehouseAddressController.text=address;
       ebarangayController.text=brgy;
       ecityController.text=city;
@@ -1789,7 +1797,7 @@ Future<String> getCityId(String provinceId, String cityName) async {
       eplanTypeController.text= pt;
       eroomAndBoardTypeController.text= rbt;
       ebenefitLimitTypeController.text=blt;
-      customerId = request['id'].toString();
+      customerId = request[0]['id'].toString();
       limit_id = ld;
       prb_id = pbd;
       card_id = cid;
@@ -2912,21 +2920,21 @@ Future<String> getCityId(String provinceId, String cityName) async {
                                                                   width:
                                                                       10),
                                                               
-                                                              if(efnameController.text!=request['first_name']||
-                                                              emnameController.text!=request['middle_name']||
-                                                              elnameController.text!=request['last_name']||
-                                                              econtactNoController.text!=request['contact_no']||
+                                                              if(efnameController.text!=request[0]['first_name']||
+                                                              emnameController.text!=request[0]['middle_name']||
+                                                              elnameController.text!=request[0]['last_name']||
+                                                              econtactNoController.text!=request[0]['contact_no']||
                                                               eemailController.text!=mail||
-                                                              _eselectedSex!=request['sex']||
-                                                              _birthday!=DateTime.parse(request['birth_date'])||
-                                                              ecivilStatusController.text!=request['civil_status']||
+                                                              _eselectedSex!=request[0]['sex']||
+                                                              _birthday!=DateTime.parse(request[0]['birth_date'])||
+                                                              ecivilStatusController.text!=request[0]['civil_status']||
                                                               ehouseAddressController.text !=address ||
                                                               eregionController.text!=myRegion ||
                                                               eprovinceController.text!=myProvince ||
                                                               ecityController.text!=city ||
                                                               ebarangayController.text!=brgy ||
                                                               epostalCodeController.text!=postal ||
-                                                              ememberTypeController.text != request['type_id'].toString() ||
+                                                              ememberTypeController.text != request[0]['type_id'].toString() ||
                                                               eenrollmentTypeController.text != et ||
                                                               eplanTypeController.text != pt ||
                                                               eroomAndBoardTypeController.text != rbt ||
@@ -3024,10 +3032,10 @@ Future<String> getCityId(String provinceId, String cityName) async {
 
 
   void showDetails(BuildContext context, final request){
-    final customerType = request['mp_customer_type_table']
+    final customerType = request[0]['mp_customer_type_table']
                             ?['customer_type'] ??
                         'N/A';
-    var cardTable = request['mp_card_table'][0];
+    var cardTable = request[0]['mp_card_table'][0];
     var selectedCard = cardTable;
     showDialog(
       context: context,
@@ -3081,56 +3089,56 @@ Future<String> getCityId(String provinceId, String cityName) async {
                               TableRow(children: [
                                 const Text("First Name",
                                     style: TextStyle(color: Colors.black)),
-                                Text(request['first_name'],
+                                Text(request[0]['first_name'],
                                     style:
                                         const TextStyle(color: Colors.black)),
                               ]),
                               TableRow(children: [
                                 const Text("Middle Name",
                                     style: TextStyle(color: Colors.black)),
-                                Text(request['middle_name'] ?? 'N/A',
+                                Text(request[0]['middle_name'] ?? 'N/A',
                                     style:
                                         const TextStyle(color: Colors.black)),
                               ]),
                               TableRow(children: [
                                 const Text("Last Name",
                                     style: TextStyle(color: Colors.black)),
-                                Text(request['last_name'],
+                                Text(request[0]['last_name'],
                                     style:
                                         const TextStyle(color: Colors.black)),
                               ]),
                               TableRow(children: [
                                 const Text("Contact Number",
                                     style: TextStyle(color: Colors.black)),
-                                Text(request['contact_no'],
+                                Text(request[0]['contact_no'],
                                     style:
                                         const TextStyle(color: Colors.black)),
                               ]),
                               TableRow(children: [
                                 const Text("Email Address",
                                     style: TextStyle(color: Colors.black)),
-                                Text(request['email_address'] ?? 'N/A',
+                                Text(request[0]['email_address'] ?? 'N/A',
                                     style:
                                         const TextStyle(color: Colors.black)),
                               ]),
                               TableRow(children: [
                                 const Text("Sex",
                                     style: TextStyle(color: Colors.black)),
-                                Text(request['sex'] ?? 'N/A',
+                                Text(request[0]['sex'] ?? 'N/A',
                                     style:
                                         const TextStyle(color: Colors.black)),
                               ]),
                               TableRow(children: [
                                 const Text("Birthdate",
                                     style: TextStyle(color: Colors.black)),
-                                Text(request['birth_date'],
+                                Text(request[0]['birth_date'],
                                     style:
                                         const TextStyle(color: Colors.black)),
                               ]),
                               TableRow(children: [
                                 const Text("Civil Status",
                                     style: TextStyle(color: Colors.black)),
-                                Text(request['civil_status'] ?? 'N/A',
+                                Text(request[0]['civil_status'] ?? 'N/A',
                                     style:
                                         const TextStyle(color: Colors.black)),
                               ]),
@@ -3177,42 +3185,42 @@ Future<String> getCityId(String provinceId, String cityName) async {
                               TableRow(children: [
                                 const Text("House Address",
                                     style: TextStyle(color: Colors.black)),
-                                Text(request['address'] ?? 'N/A',
+                                Text(request[0]['address'] ?? 'N/A',
                                     style:
                                         const TextStyle(color: Colors.black)),
                               ]),
                               TableRow(children: [
                                 const Text("Barangay",
                                     style: TextStyle(color: Colors.black)),
-                                Text(request['barangay'] ?? 'N/A',
+                                Text(request[0]['barangay'] ?? 'N/A',
                                     style:
                                         const TextStyle(color: Colors.black)),
                               ]),
                               TableRow(children: [
                                 const Text("City",
                                     style: TextStyle(color: Colors.black)),
-                                Text(request['city'] ?? 'N/A',
+                                Text(request[0]['city'] ?? 'N/A',
                                     style:
                                         const TextStyle(color: Colors.black)),
                               ]),
                               TableRow(children: [
                                 const Text("Province",
                                     style: TextStyle(color: Colors.black)),
-                                Text(request['province'] ?? 'N/A',
+                                Text(request[0]['province'] ?? 'N/A',
                                     style:
                                         const TextStyle(color: Colors.black)),
                               ]),
                               TableRow(children: [
                                 const Text("Region",
                                     style: TextStyle(color: Colors.black)),
-                                Text(request['region'] ?? 'N/A',
+                                Text(request[0]['region'] ?? 'N/A',
                                     style:
                                         const TextStyle(color: Colors.black)),
                               ]),
                               TableRow(children: [
                                 const Text("Postal Code",
                                     style: TextStyle(color: Colors.black)),
-                                Text(request['postal_code'] ?? 'N/A',
+                                Text(request[0]['postal_code'] ?? 'N/A',
                                     style:
                                         const TextStyle(color: Colors.black)),
                               ]),

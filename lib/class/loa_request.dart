@@ -127,5 +127,48 @@ class ApiService {
 
 
 
+Future<List<Map<String, dynamic>>> getMemberById(int customerId, String supabaseUrl, String supabaseKey) async {
+  var myUrl = 'https://medicareplus-api.vercel.app';
+
+  try {
+    final response = await http.post(
+      Uri.parse('$myUrl/api/admin/get_member_by_id?customer_id=$customerId'),
+      headers: {
+        'Content-Type': 'application/json',
+        'supabase-url': supabaseUrl,
+        'supabase-key': supabaseKey,
+      },
+      body: json.encode({
+        'customer_id': customerId,  // Send customer_id in the request body
+      }),
+    );
+
+    if (response.statusCode == 200) {
+      final data = json.decode(response.body);
+
+      //print('Response data: $data');  // Debugging output
+
+      // Check if 'members' is a list or a map
+      if (data['members'] is List) {
+        // If it's already a list, return it as a List<Map<String, dynamic>>
+        return List<Map<String, dynamic>>.from(data['members']);
+      } else if (data['members'] is Map) {
+        // If it's a map (single member), convert it to a list with that single map
+        return [data['members']];
+      } else {
+        // Return an empty list if 'members' is neither a List nor a Map
+        return [];
+      }
+    } else {
+      throw Exception('Failed to load member');
+    }
+  } catch (e) {
+    print('Error: $e');
+    return []; // Return an empty list on error
+  }
+}
+
+
+
 
 }
