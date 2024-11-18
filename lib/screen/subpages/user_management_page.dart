@@ -881,21 +881,7 @@ class _UserManagementPageState extends State<UserManagementPage> {
               final List<Map<String, dynamic>> filteredRequests;
               // Filtering 
               if(filterCriteria==''){
-                filteredRequests = requestsList;/*.where((request) {
-                final customerType = request['mp_customer_type_table']?['customer_type']?.toLowerCase() ?? '';
-                final otherField1 = request['last_name']?.toLowerCase() ?? '';
-                final otherField2 = request['first_name']?.toLowerCase() ?? '';
-                final email = request['email_address']?.toLowerCase() ?? '';
-                final cardNumbers = (request['mp_card_table'] as List<dynamic>?)?.map((card) {
-                  return card['card_number']?.toString() ?? '';
-                }).join(', ') ?? '';
-
-                return customerType.contains(searchQuery) ||
-                    otherField1.contains(searchQuery) ||
-                    otherField2.contains(searchQuery) ||
-                    cardNumbers.contains(searchQuery) ||
-                    email.contains(searchQuery);
-              }).toList();*/
+                filteredRequests = requestsList;
               }else{
                 filteredRequests = requestsList.where((request) {
                 // Check which filter is applied and filter accordingly
@@ -931,10 +917,10 @@ class _UserManagementPageState extends State<UserManagementPage> {
                   // Filter by customer type
                   final customerType = request['mp_customer_type_table']?['customer_type']?.toLowerCase() ?? '';
                   return customerType.contains(searchQuery);
-                }else if (filterCriteria == 'contact') {
+                }else if (filterCriteria == 'contacts') {
                   // Filter by customer type
-                  final contact = request['contact_no'];
-                  return contact.contains(searchQuery);
+                  final myContact = request['contact_no'].toString();
+                  return myContact.contains(searchQuery);
                 } else {
                   return false;
                 }
@@ -1251,12 +1237,12 @@ class _UserManagementPageState extends State<UserManagementPage> {
                               child: GestureDetector(
                                 onTap: () {
                                   setState(() {
-                                    if (filterCriteria == 'contact') {
+                                    if (filterCriteria == 'contacts') {
                                       filterCriteria = ''; // Clear the filterCriteria (or set to null)
                                       searchQuery = ''; // Optionally reset the search query
                                       searchController.text='';
                                     } else {
-                                      filterCriteria = 'contact'; // Set to 'member' if it's not already
+                                      filterCriteria = 'contacts'; // Set to 'member' if it's not already
                                       searchQuery = ''; // Optionally reset the search query
                                       searchController.text='';
                                     }
@@ -1264,7 +1250,7 @@ class _UserManagementPageState extends State<UserManagementPage> {
                                 },
                                 child: Container(
                                   decoration: BoxDecoration(
-                                    color: filterCriteria=='contact'?const Color(0xFF13322B):Colors.transparent,
+                                    color: filterCriteria=='contacts'?const Color(0xFF13322B):Colors.transparent,
                                     border: Border.all(
                                       color: Colors
                                           .black, // Outline color for the text container
@@ -1278,7 +1264,7 @@ class _UserManagementPageState extends State<UserManagementPage> {
                                     'Phone Number',
                                     style: TextStyle(
                                         fontWeight: FontWeight.bold,
-                                        color: filterCriteria=='contact'?const Color(0xFFFFFFFF):Colors.black),
+                                        color: filterCriteria=='contacts'?const Color(0xFFFFFFFF):Colors.black),
                                   ),
                                 ),
                               ),
