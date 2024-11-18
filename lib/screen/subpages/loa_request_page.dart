@@ -1713,6 +1713,11 @@ Future<void> _releasedRequest(String lockedBy, String requestId) async {
                                                                                 const Text("Patient Name", style: TextStyle(color: Colors.black)),
                                                                                 Text(patientName ?? 'N/A', style: const TextStyle(color: Colors.black)),
                                                                               ]),
+
+                                                                              TableRow(children: [
+                                                                                const Text("Contact No", style: TextStyle(color: Colors.black)),
+                                                                                Text(request['patient_contact'] ?? 'N/A', style: const TextStyle(color: Colors.black)),
+                                                                              ]),
                                                                               
                                                                               TableRow(children: [
                                                                                 const Text("Card Number", style: TextStyle(color: Colors.black)),

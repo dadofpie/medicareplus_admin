@@ -15,6 +15,7 @@ import 'package:medicare_admin_remaster/class/status_item.dart';
 import 'package:medicare_admin_remaster/services/ggx_connection.dart';
 import 'package:medicare_admin_remaster/shared/api.dart';
 import 'package:medicare_admin_remaster/shared/list.dart';
+import 'package:medicare_admin_remaster/shared/members.dart';
 import 'package:medicare_admin_remaster/widget/address_dropdown.dart';
 import 'package:medicare_admin_remaster/widget/birthday_picker.dart';
 import 'dart:html' as html;
@@ -140,7 +141,7 @@ class _UserManagementPageState extends State<UserManagementPage> {
         'https://medicareplus-api.vercel.app');
     requests = _apiService.streamMembers(supabaseUrl, supabaseKey);
 
-   
+    print(member.length);
     
   }
 
@@ -421,7 +422,7 @@ class _UserManagementPageState extends State<UserManagementPage> {
     }
 
     try {
-      var response = await request.send().timeout(const Duration(seconds: 10));
+      var response = await request.send().timeout(const Duration(seconds: 20));
 
       if (response.statusCode == 200) {
         final responseData = await http.Response.fromStream(response);
@@ -1514,8 +1515,8 @@ class _UserManagementPageState extends State<UserManagementPage> {
                                                       IconButton(
                                                         icon: const Icon(
                                                             Icons.edit), // Edit icon
-                                                        onPressed: () {
-                                                          setState(() {
+                                                        onPressed: () async{
+                                                          /*setState(()  {
                                                               // Set selectedRegion
                                                               selectedRegion = regions.firstWhere(
                                                                 (region) => region.regionName == request['region'],
@@ -1533,19 +1534,30 @@ class _UserManagementPageState extends State<UserManagementPage> {
                                                                 (city) => city.name == request['city'],
                                                                 orElse: () => City(code: '', name: 'Not Found'),
                                                               ).code;
-                                                              
+
                                                             
-                                                            });
+                                                            });*/
 
+                                                              
+                                                              if(request['region'] !=null && request['province']!=null && request['city']!=null){
+                                                                
+                                                                selectedRegion=await getRegionId(request['region']);
+                                                                selectedProvince = await getProvinceId(selectedRegion!, request['province']);
+                                                                selectedCity = await getCityId(selectedProvince!, request['city']);
+                                                                print(selectedRegion);
+                                                                print(selectedProvince);
+                                                                print(selectedCity);
+                                                                await fetchProvinces(selectedRegion!, setState);
+                                                                await fetchCities(selectedProvince!, setState);
+                                                              }
+                                                              
                                                             // After setState completes, fetch the provinces and other data
-                                                            WidgetsBinding.instance.addPostFrameCallback((_)async {
+                                                            /*WidgetsBinding.instance.addPostFrameCallback((_) async{
                                                               // Now that the state is updated, fetch provinces, cities, and barangays
-                                                              await fetchProvinces(selectedRegion!, setState);
-                                                              await fetchCities(selectedProvince!, setState);
-                                                              fetchBarangays(selectedCity!, setState);
-
-                                                              print(provinces);  // For debugging
-                                                            });
+                                                               await fetchProvinces(selectedRegion!, setState);
+                                                               await fetchCities(selectedProvince!, setState);
+                                                               await fetchBarangays(selectedCity!, setState);  // For debugging
+                                                            });*/
 
                                                           _showDialogEdit(context, request, setState);
                                                         },
@@ -1628,6 +1640,68 @@ class _UserManagementPageState extends State<UserManagementPage> {
     );
   }
 
+
+  Future<String> getRegionId(String regionName) async {
+  var apiUrl = '$ggxUrl/v2/locations/countries/PH/regions';
+  var jwt = ggx.generateJwt();
+  final response = await http.get(Uri.parse(apiUrl), headers: {
+    'Content-Type': 'application/json',
+    'Authorization': 'Bearer $jwt',
+  });
+
+  if (response.statusCode == 200) {
+    final Map<String, dynamic> data = json.decode(response.body);
+    final List<dynamic> regionsJson = data['data'];
+    var region = regionsJson.firstWhere(
+      (region) => region['name'] == regionName,
+      orElse: () => null,
+    );
+    return region?['id'].toString() ?? '';  // Return the Region ID
+  }
+  throw Exception('Region not found');
+}
+
+// Fetch Province ID by Region ID
+Future<String> getProvinceId(String regionId, String provinceName) async {
+  var apiUrl = '$ggxUrl/v2/locations/regions/$regionId/provinces';
+  var jwt = ggx.generateJwt();
+  final response = await http.get(Uri.parse(apiUrl), headers: {
+    'Content-Type': 'application/json',
+    'Authorization': 'Bearer $jwt',
+  });
+
+  if (response.statusCode == 200) {
+    final Map<String, dynamic> data = json.decode(response.body);
+    final List<dynamic> provincesJson = data['data'];
+    var province = provincesJson.firstWhere(
+      (province) => province['name'] == provinceName,
+      orElse: () => null,
+    );
+    return province?['id'].toString() ?? '';  // Return the Province ID
+  }
+  throw Exception('Province not found');
+}
+
+Future<String> getCityId(String provinceId, String cityName) async {
+  var apiUrl = '$ggxUrl/v2/locations/provinces/$provinceId/cities';
+  var jwt = ggx.generateJwt();
+  final response = await http.get(Uri.parse(apiUrl), headers: {
+    'Content-Type': 'application/json',
+    'Authorization': 'Bearer $jwt',
+  });
+
+  if (response.statusCode == 200) {
+    final Map<String, dynamic> data = json.decode(response.body);
+    final List<dynamic> citiesJson = data['data'];
+    var city = citiesJson.firstWhere(
+      (city) => city['name'] == cityName,
+      orElse: () => null,
+    );
+    return city?['id'].toString() ?? '';  // Return the City ID
+  }
+  throw Exception('City not found');
+}
+
   void _showDialogEdit(BuildContext context, final request, StateSetter setState) {
     final customerType = request['mp_customer_type_table']
                             ?['customer_type'] ??
@@ -1696,7 +1770,7 @@ class _UserManagementPageState extends State<UserManagementPage> {
     String mail=request['email_address'] ?? '';
     setState(() {
       efnameController.text=request['first_name'];
-      emnameController.text=request['middle_name'];
+      emnameController.text=request['middle_name'] ?? '';
       elnameController.text=request['last_name'];
       econtactNoController.text=request['contact_no'] ?? '';
       eemailController.text=mail;
@@ -2347,11 +2421,10 @@ class _UserManagementPageState extends State<UserManagementPage> {
                                           ebenefitLimitController.text='';
                                           eroomAndBoardLimitController.text='';
                                           _isFormValid=true;
-                                          //selectedRegion=null;
+                                          selectedRegion=null;
                                           _eselectedSex=null;
                                           _birthday=null;
-                                          /*regions.clear();
-                                          provinces.clear();
+                                          /*provinces.clear();
                                           cities.clear();
                                           barangays.clear();*/
                                         });

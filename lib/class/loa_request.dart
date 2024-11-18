@@ -42,10 +42,11 @@ class ApiService {
   }
 
   Stream<List<Map<String, dynamic>>> streamMembers(String supabaseUrl, String supabaseKey) async* {
+    var apiUrl ='https://medicareplus-api.vercel.app';
     while (true) {
       try {
         final response = await http.get(
-          Uri.parse('https://medicareplus-api.vercel.app/api/admin/get_all_members'),
+          Uri.parse('$apiUrl/api/admin/get_all_members'),
           headers: {
             'Content-Type': 'application/json',
             'supabase-url': supabaseUrl,
@@ -67,5 +68,64 @@ class ApiService {
       await Future.delayed(const Duration(seconds: 5)); // Refresh every 5 seconds
     }
   }
+
+  /*Stream<List<Map<String, dynamic>>> streamMembers(String supabaseUrl, String supabaseKey) async* {
+  var apiUrl = 'https://medicareplus-api.vercel.app/api/admin/get_all_members?page=1&pageSize=500'; // Initial URL
+  List<Map<String, dynamic>> allMembers = [];  // Accumulate all members here
+
+  while (apiUrl.isNotEmpty) {
+    try {
+      final response = await http.get(
+        Uri.parse(apiUrl),
+        headers: {
+          'Content-Type': 'application/json',
+          'supabase-url': supabaseUrl,
+          'supabase-key': supabaseKey,
+        },
+      );
+
+      if (response.statusCode == 200) {
+        final data = json.decode(response.body);
+        final List<Map<String, dynamic>> members = List<Map<String, dynamic>>.from(data['members'] ?? []);
+
+        // Add the current page of members to the allMembers list
+        allMembers.addAll(members);
+        print('Fetched ${members.length} members, total: ${allMembers.length}');
+
+        // Check if there is a nextPage URL in the pagination data
+        String? nextPageUrl = data['pagination']?['nextPage'];
+
+        // If there's a nextPage, update the apiUrl to the nextPage URL
+        if (nextPageUrl != null && nextPageUrl.isNotEmpty) {
+          // If nextPageUrl is relative, we need to prepend the base URL
+          if (nextPageUrl.startsWith('/')) {
+            apiUrl = 'https://medicareplus-api.vercel.app$nextPageUrl';
+          } else {
+            apiUrl = nextPageUrl;
+          }
+          print('Next page URL: $apiUrl');
+        } else {
+          // No more pages, exit the loop
+          apiUrl = '';  
+        }
+      } else {
+        throw Exception('Failed to load members, status: ${response.statusCode}');
+      }
+    } catch (e) {
+      print('Error: $e');
+      yield []; // Emit an empty list on error
+      break; // Exit the loop on error
+    }
+
+    // Wait for 5 seconds before fetching the next page to avoid rate limiting
+    await Future.delayed(const Duration(seconds: 5));
+  }
+
+  // Once all pages are fetched, emit the full list of members
+  yield allMembers;
+}*/
+
+
+
 
 }
