@@ -37,7 +37,7 @@ class ApiService {
         yield []; // Emit an empty list on error
       }
 
-      await Future.delayed(const Duration(seconds: 5)); // Refresh every 10 seconds
+      await Future.delayed(const Duration(seconds: 2)); // Refresh every 10 seconds
     }
   }
 

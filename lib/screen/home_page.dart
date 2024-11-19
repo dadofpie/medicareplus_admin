@@ -35,7 +35,7 @@ class _HomePageState extends State<HomePage> {
     super.initState();
     fetchPendingCount('pending'); // Fetch pending count on init
     // Start a timer to refresh the pending count every 30 seconds
-    _timer = Timer.periodic(const Duration(seconds: 6), (timer) {
+    _timer = Timer.periodic(const Duration(seconds: 3), (timer) {
       fetchPendingCount('pending');
     });
   }
