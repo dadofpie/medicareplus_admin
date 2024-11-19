@@ -1374,8 +1374,7 @@ Future<bool> _releasedRequest(String lockedBy, String requestId) async {
 // Action
                                         Expanded(
                                           child: Padding(
-                                            padding:
-                                                const EdgeInsets.only(left: 50),
+                                            padding: EdgeInsets.only(left: request['locked_by'] != null?0:50),
                                             child: Row(
                                               mainAxisAlignment:
                                                   MainAxisAlignment
@@ -1446,6 +1445,7 @@ Future<bool> _releasedRequest(String lockedBy, String requestId) async {
                                                                           'rejected' || request['status']=='cancelled'
                                                                   ? null // Disable if status is approved or rejected
                                                                   : () async{ 
+                                                                    print(request['locked_by']);
                                                                       bool isStated =await _releasedRequest(authState.uid.toString() ,request['request_id'].toString());
                                                                       if(isStated){
                                                                         String lockedId = await _lockedRequest(authState.uid.toString(), request['request_id'].toString());
@@ -1515,7 +1515,7 @@ Future<bool> _releasedRequest(String lockedBy, String requestId) async {
                                                                     },
                                                             ),
 
-                                                            if(request['locked_by']==authState.uid.toString())
+                                                            if(request['locked_by']==authState.uid)
                                                               IconButton(
                                                                 icon: const Icon(Icons.lock), // Three-dot icon
                                                                 onPressed: ()async {
