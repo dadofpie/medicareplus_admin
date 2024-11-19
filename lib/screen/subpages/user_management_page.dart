@@ -889,7 +889,8 @@ class _UserManagementPageState extends State<UserManagementPage> {
                   // Filter by first name or last name
                   final firstName = request['first_name']?.toLowerCase() ?? '';
                   final lastName = request['last_name']?.toLowerCase() ?? '';
-                  return firstName.contains(searchQuery) || lastName.contains(searchQuery);
+                  final fullName='$lastName, $firstName';
+                  return fullName.contains(searchQuery);
                 }else if(filterCriteria == 'card_number'){
                   final cardNumbers = (request['mp_card_table'] as List<dynamic>?)?.map((card) {
                     return card['card_number']?.toString() ?? '';
@@ -1123,6 +1124,32 @@ class _UserManagementPageState extends State<UserManagementPage> {
                           children: [
                             // PNP Number Section (No Divider)
                             // Requester Name
+                            Expanded(
+                              flex: 1, // Same flex for each column
+                              child: GestureDetector(
+                              onTap: () {
+                              },
+                                child: Container(
+                                  decoration: BoxDecoration(
+                                    color: Colors.transparent,
+                                    border: Border.all(
+                                      color: Colors
+                                          .black, // Outline color for the text container
+                                      width:
+                                          1.0, // Outline width for the text container
+                                    ),
+                                  ),
+                                  padding: const EdgeInsets.all(
+                                      8.0), // Padding inside the text container
+                                  child:  const Text(
+                                    'ID',
+                                    style: TextStyle(
+                                        fontWeight: FontWeight.bold,
+                                        color: Colors.black),
+                                  ),
+                                ),
+                              ),
+                            ),
                             Expanded(
                               flex: 1, // Same flex for each column
                               child: GestureDetector(
@@ -1378,7 +1405,7 @@ class _UserManagementPageState extends State<UserManagementPage> {
                                   ?['customer_type'] ??
                               'N/A';
                           final cardTable = request['mp_card_table'];
-                    
+                          final fullName = '${request['last_name']}, ${request['first_name']}';
                           if (cardTable != null && cardTable.isNotEmpty) {
                             // Join the card numbers into a single string
                             cardNumbers = cardTable
@@ -1422,8 +1449,10 @@ class _UserManagementPageState extends State<UserManagementPage> {
                                   children: [
                                     Expanded(
                                         child: TableCellContent(
-                                            content:
-                                                '${request['last_name']}, ${request['first_name']}')),
+                                            content:request['id'].toString())),
+                                    Expanded(
+                                        child: TableCellContent(
+                                            content:fullName)),
                                     Expanded(
                                         child:
                                             TableCellContent(content: customerType)),

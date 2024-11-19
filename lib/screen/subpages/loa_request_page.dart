@@ -202,7 +202,7 @@ Future<void> _pickFiles(StateSetter setState) async {
 }
 
 
-Future<void> _releasedRequest(String lockedBy, String requestId) async {
+/*Future<void> _releasedRequest(String lockedBy, String requestId) async {
   String url = '$apiUrl/released_request_form';
 
   final Map<String, dynamic> data = {
@@ -232,7 +232,42 @@ Future<void> _releasedRequest(String lockedBy, String requestId) async {
   } catch (error) {
     print('Unexpected error: $error');
   }
+}*/
+
+Future<bool> _releasedRequest(String lockedBy, String requestId) async {
+  String url = '$apiUrl/released_request_form';
+
+  final Map<String, dynamic> data = {
+    'locked_by': lockedBy,
+    'request_id': requestId,
+  };
+
+  try {
+    final response = await http.post(
+      Uri.parse(url),
+      headers: {
+        'Content-Type': 'application/json',
+        'supabase-url': supabaseUrl,
+        'supabase-key': supabaseKey,
+      },
+      body: json.encode(data),
+    );
+
+    if (response.statusCode == 200) {
+      final responseData = json.decode(response.body);
+      print('Request is locked: ${responseData['message']}');
+      return true;  // Request processed successfully
+    } else {
+      final errorData = json.decode(response.body);
+      print('Error: ${errorData['error']}');
+      return false;  // Error processing the request
+    }
+  } catch (error) {
+    print('Unexpected error: $error');
+    return false;  // Error occurred during the request
+  }
 }
+
 
 
 
@@ -1367,18 +1402,35 @@ Future<void> _releasedRequest(String lockedBy, String requestId) async {
                                                                   ? null // Disable if status is approved or rejected
                                                                   : () async {
                                                                       // Show green modal when check icon is clicked
-                                                                      String lockedId = await _lockedRequest(authState.uid.toString(), request['request_id'].toString());
-                                                                      if(lockedId==authState.uid.toString()){
-                                                                        showApprovalDialog(
-                                                                          context,
-                                                                          request,
-                                                                          setState,
-                                                                          authState
-                                                                              .uid
-                                                                              .toString());
+                                                                      bool isStated =await _releasedRequest(authState.uid.toString() ,request['request_id'].toString());
+                                                                      if(isStated){
+                                                                        String lockedId = await _lockedRequest(authState.uid.toString(), request['request_id'].toString());
+                                                                        if(lockedId==authState.uid.toString()){
+                                                                          showApprovalDialog(
+                                                                            context,
+                                                                            request,
+                                                                            setState,
+                                                                            authState
+                                                                                .uid
+                                                                                .toString());
+                                                                        }else{
+                                                                        _showMessage('Request is currently being processed by another user','Error');
+                                                                        }
                                                                       }else{
-                                                                       _showMessage('Request is currently being processed by another user','Error');
+                                                                        String lockedId = await _lockedRequest(authState.uid.toString(), request['request_id'].toString());
+                                                                        if(lockedId==authState.uid.toString()){
+                                                                          showApprovalDialog(
+                                                                            context,
+                                                                            request,
+                                                                            setState,
+                                                                            authState
+                                                                                .uid
+                                                                                .toString());
+                                                                        }else{
+                                                                        _showMessage('Request is currently being processed by another user','Error');
                                                                       }
+                                                                      }
+                                                                      
                                                                     },
                                                             ),
                                                             if (state.adminType ==
@@ -1393,162 +1445,38 @@ Future<void> _releasedRequest(String lockedBy, String requestId) async {
                                                                       request['status'] ==
                                                                           'rejected' || request['status']=='cancelled'
                                                                   ? null // Disable if status is approved or rejected
-                                                                  : () async{
-                                                                      // Show red modal when close icon is clicked
-                                                                      bool isLoading = false; // Add this variable to manage loading state
-                                                                      /*setState(() {
-                                                                        isReject=false;
-                                                                      });*/
-                                                                      String lockedId = await _lockedRequest(authState.uid.toString(), request['request_id'].toString());
-                                                                      if(lockedId==authState.uid.toString()){
+                                                                  : () async{ 
+                                                                      bool isStated =await _releasedRequest(authState.uid.toString() ,request['request_id'].toString());
+                                                                      if(isStated){
+                                                                        String lockedId = await _lockedRequest(authState.uid.toString(), request['request_id'].toString());
+                                                                        if(lockedId==authState.uid.toString()){
+                                                                          showRejectDialog(context,
+                                                                              request,
+                                                                              setState,
+                                                                              authState
+                                                                                  .uid
+                                                                                  .toString());
                                                                         
-                                                                      showDialog(
-                                                                        context: context,
-                                                                        barrierDismissible: false,
-                                                                        builder:
-                                                                            (BuildContext
-                                                                                context) {
-                                                                          TextEditingController
-                                                                              rejectionController =
-                                                                              TextEditingController();
-                                                                          bool
-                                                                              isTextFieldEmpty =
-                                                                              true; // Track if text field is empty
-                                                                          String
-                                                                              errorMessage =
-                                                                              ''; // Variable to hold the error message
-
-                                                                          return StatefulBuilder(
-                                                                            // Use StatefulBuilder to manage state in dialog
-                                                                            builder:
-                                                                                (context, setState) {
-                                                                              return AlertDialog(
-                                                                                backgroundColor: const Color.fromARGB(255, 255, 255, 255),
-                                                                                title: const Text(
-                                                                                  'REJECT',
-                                                                                  style: TextStyle(
-                                                                                    color: Color(0xff13322b),
-                                                                                    fontSize: 15,
-                                                                                    fontWeight: FontWeight.w600,
-                                                                                  ),
-                                                                                ),
-                                                                                content: SizedBox(
-                                                                                  width: 300,
-                                                                                  height: 150, // Increased height for the error message
-                                                                                  child: isLoading
-                                                                                      ? const Center(
-                                                                                          // Center the spinner when loading
-                                                                                          child: SpinKitCircle(
-                                                                                            color: Color(0xff13322B), // Change the color as needed
-                                                                                            size: 50.0, // Adjust size as needed
-                                                                                          ),
-                                                                                        )
-                                                                                      : Column(
-                                                                                          mainAxisSize: MainAxisSize.min,
-                                                                                          children: [
-                                                                                            const SizedBox(height: 20),
-                                                                                            TextField(
-                                                                                              controller: rejectionController,
-                                                                                              onChanged: (text) {
-                                                                                                setState(() {
-                                                                                                  isTextFieldEmpty = text.isEmpty; // Update the state based on input
-                                                                                                  errorMessage = ''; // Clear the error message when typing
-                                                                                                });
-                                                                                              },
-                                                                                              decoration: InputDecoration(
-                                                                                                hintText: 'Type your rejection reason here...',
-                                                                                                hintStyle: const TextStyle(color: Color.fromARGB(137, 52, 52, 52)),
-                                                                                                filled: true,
-                                                                                                fillColor: const Color.fromARGB(255, 145, 145, 145).withOpacity(0.1),
-                                                                                                border: const OutlineInputBorder(
-                                                                                                  borderRadius: BorderRadius.all(Radius.circular(8.0)),
-                                                                                                  borderSide: BorderSide.none,
-                                                                                                ),
-                                                                                                errorText: isTextFieldEmpty ? errorMessage : null, // Show error message if empty
-                                                                                                errorStyle: const TextStyle(color: Colors.red), // Set error text color
-                                                                                              ),
-                                                                                              style: const TextStyle(color: Color.fromARGB(255, 0, 0, 0)),
-                                                                                              maxLines: 3, // Allow multiple lines for longer input
-                                                                                            ),
-                                                                                          ],
-                                                                                        ),
-                                                                                ),
-                                                                                actions: [
-                                                                                  TextButton(
-                                                                                    onPressed: !isLoading?() async {
-                                                                                      
-                                                                                      if (isTextFieldEmpty) {
-                                                                                        setState(() {
-                                                                                          errorMessage = 'Please state reason for rejection'; // Set error message if text field is empty
-                                                                                        });
-                                                                                        return; // Prevent submission
-                                                                                      }
-
-                                                                                      setState(() {
-                                                                                        isLoading = true; // Set loading state to true when the button is pressed
-                                                                                      });
-
-                                                                                      String rejectionReason = rejectionController.text;
-                                                                                      bool isStated = await _updateRequestForm(
-                                                                                        request['request_id'].toString(),
-                                                                                        'rejected',
-                                                                                        '',
-                                                                                        authState.uid.toString(),
-                                                                                        '',
-                                                                                        rejectionReason,
-                                                                                      );
-
-                                                                                      setState(() {
-                                                                                        isLoading = false; // Reset loading state after the operation
-                                                                                      });
-
-                                                                                      if (isStated) {
-                                                                                        // Close all dialogs and show the success message
-                                                                                        Navigator.of(context).popUntil((route) => route.isFirst); // Close all modals
-                                                                                        _showMessage('LOA Request ID: ${request['request_id']} has been rejected', 'Rejection Completed');
-                                                                                      } else {
-                                                                                        Navigator.of(context).popUntil((route) => route.isFirst);
-                                                                                        _showMessage(message.isNotEmpty ? message : 'Request is currently being processed by another user', 'Error');
-                                                                                      }
-                                                                                    }:null,
-                                                                                    style: TextButton.styleFrom(
-                                                                                      backgroundColor: const Color(0xff13322b),
-                                                                                      shape: RoundedRectangleBorder(
-                                                                                        borderRadius: BorderRadius.circular(8),
-                                                                                      ),
-                                                                                    ),
-                                                                                    child: const Text(
-                                                                                      'Submit',
-                                                                                      style: TextStyle(color: Color.fromARGB(255, 255, 255, 255)),
-                                                                                    ),
-                                                                                  ),
-                                                                                  TextButton(
-                                                                                    onPressed:!isLoading? () {
-                                                                                      setState((){
-                                                                                          _releasedRequest(authState.uid.toString() ,request['request_id'].toString());
-                                                                                      });
-                                                                                      Navigator.of(context).pop();
-                                                                                    }:null,
-                                                                                    style: TextButton.styleFrom(
-                                                                                      backgroundColor: const Color(0xff13322b),
-                                                                                      shape: RoundedRectangleBorder(
-                                                                                        borderRadius: BorderRadius.circular(8),
-                                                                                      ),
-                                                                                    ),
-                                                                                    child: const Text(
-                                                                                      'Close',
-                                                                                      style: TextStyle(color: Color.fromARGB(255, 254, 254, 254)),
-                                                                                    ),
-                                                                                  ),
-                                                                                ],
-                                                                              );
-                                                                            },
-                                                                          );
-                                                                        },
-                                                                      );
-                                                                      }else{
-                                                                       _showMessage('Request is currently being processed by another user','Error');
+                                                                        }else{
+                                                                        _showMessage('Request is currently being processed by another user','Error');
+                                                                        }
+                                                                      
+                                                                      }else
+                                                                      {
+                                                                        String lockedId = await _lockedRequest(authState.uid.toString(), request['request_id'].toString());
+                                                                        if(lockedId==authState.uid.toString()){
+                                                                          showRejectDialog(context,
+                                                                              request,
+                                                                              setState,
+                                                                              authState
+                                                                                  .uid
+                                                                                  .toString());
+                                                                        
+                                                                        }else{
+                                                                        _showMessage('Request is currently being processed by another user','Error');
+                                                                        }
                                                                       }
+                                                                      
                                                                     },
                                                             ),
                                                             if (state.adminType ==
@@ -1586,6 +1514,17 @@ Future<void> _releasedRequest(String lockedBy, String requestId) async {
                                                                           name);
                                                                     },
                                                             ),
+
+                                                            if(request['locked_by']==authState.uid.toString())
+                                                              IconButton(
+                                                                icon: const Icon(Icons.lock), // Three-dot icon
+                                                                onPressed: ()async {
+                                                                 bool isStated= await _releasedRequest(authState.uid.toString() ,request['request_id'].toString());
+                                                                 if(isStated){
+                                                                  _showMessage('LOA is now unlocked', 'Unlocked Successfully');
+                                                                 }
+                                                                }
+                                                              ),
                                                           ],
                                                         );
                                                       
@@ -1594,6 +1533,7 @@ Future<void> _releasedRequest(String lockedBy, String requestId) async {
                                                         .shrink();
                                                   },
                                                 ),
+                                                
                                                 IconButton(
                                                   icon: const Icon(Icons
                                                       .more_vert), // Three-dot icon
@@ -1842,6 +1782,173 @@ Future<void> _releasedRequest(String lockedBy, String requestId) async {
           return Container(); // Fallback if no auth state is found
         },
       ),
+    );
+  }
+
+
+  void showRejectDialog(BuildContext context, final request, StateSetter setState, String uid){
+    bool isLoading =false;
+    showDialog(
+      context: context,
+      barrierDismissible: false,
+      builder: (BuildContext context) {
+        TextEditingController rejectionController = TextEditingController();
+        bool isTextFieldEmpty = true; // Track if text field is empty
+        String errorMessage = ''; // Variable to hold the error message
+
+        return StatefulBuilder(
+          // Use StatefulBuilder to manage state in dialog
+          builder: (context, setState) {
+            return AlertDialog(
+              backgroundColor: const Color.fromARGB(255, 255, 255, 255),
+              title: const Text(
+                'REJECT',
+                style: TextStyle(
+                  color: Color(0xff13322b),
+                  fontSize: 15,
+                  fontWeight: FontWeight.w600,
+                ),
+              ),
+              content: SizedBox(
+                width: 300,
+                height: 150, // Increased height for the error message
+                child: isLoading
+                    ? const Center(
+                        // Center the spinner when loading
+                        child: SpinKitCircle(
+                          color:
+                              Color(0xff13322B), // Change the color as needed
+                          size: 50.0, // Adjust size as needed
+                        ),
+                      )
+                    : Column(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          const SizedBox(height: 20),
+                          TextField(
+                            controller: rejectionController,
+                            onChanged: (text) {
+                              setState(() {
+                                isTextFieldEmpty = text
+                                    .isEmpty; // Update the state based on input
+                                errorMessage =
+                                    ''; // Clear the error message when typing
+                              });
+                            },
+                            decoration: InputDecoration(
+                              hintText: 'Type your rejection reason here...',
+                              hintStyle: const TextStyle(
+                                  color: Color.fromARGB(137, 52, 52, 52)),
+                              filled: true,
+                              fillColor:
+                                  const Color.fromARGB(255, 145, 145, 145)
+                                      .withOpacity(0.1),
+                              border: const OutlineInputBorder(
+                                borderRadius:
+                                    BorderRadius.all(Radius.circular(8.0)),
+                                borderSide: BorderSide.none,
+                              ),
+                              errorText: isTextFieldEmpty
+                                  ? errorMessage
+                                  : null, // Show error message if empty
+                              errorStyle: const TextStyle(
+                                  color: Colors.red), // Set error text color
+                            ),
+                            style: const TextStyle(
+                                color: Color.fromARGB(255, 0, 0, 0)),
+                            maxLines:
+                                3, // Allow multiple lines for longer input
+                          ),
+                        ],
+                      ),
+              ),
+              actions: [
+                TextButton(
+                  onPressed: !isLoading
+                      ? () async {
+                          if (isTextFieldEmpty) {
+                            setState(() {
+                              errorMessage =
+                                  'Please state reason for rejection'; // Set error message if text field is empty
+                            });
+                            return; // Prevent submission
+                          }
+
+                          setState(() {
+                            isLoading =
+                                true; // Set loading state to true when the button is pressed
+                          });
+
+                          String rejectionReason = rejectionController.text;
+                          bool isStated = await _updateRequestForm(
+                            request['request_id'].toString(),
+                            'rejected',
+                            '',
+                            uid,
+                            '',
+                            rejectionReason,
+                          );
+
+                          setState(() {
+                            isLoading =
+                                false; // Reset loading state after the operation
+                          });
+
+                          if (isStated) {
+                            // Close all dialogs and show the success message
+                            Navigator.of(context).popUntil(
+                                (route) => route.isFirst); // Close all modals
+                            _showMessage(
+                                'LOA Request ID: ${request['request_id']} has been rejected',
+                                'Rejection Completed');
+                          } else {
+                            Navigator.of(context)
+                                .popUntil((route) => route.isFirst);
+                            _showMessage(
+                                message.isNotEmpty
+                                    ? message
+                                    : 'Request is currently being processed by another user',
+                                'Error');
+                          }
+                        }
+                      : null,
+                  style: TextButton.styleFrom(
+                    backgroundColor: const Color(0xff13322b),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(8),
+                    ),
+                  ),
+                  child: const Text(
+                    'Submit',
+                    style: TextStyle(color: Color.fromARGB(255, 255, 255, 255)),
+                  ),
+                ),
+                TextButton(
+                  onPressed: !isLoading
+                      ? () {
+                          setState(() {
+                            _releasedRequest(uid,
+                                request['request_id'].toString());
+                          });
+                          Navigator.of(context).pop();
+                        }
+                      : null,
+                  style: TextButton.styleFrom(
+                    backgroundColor: const Color(0xff13322b),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(8),
+                    ),
+                  ),
+                  child: const Text(
+                    'Close',
+                    style: TextStyle(color: Color.fromARGB(255, 254, 254, 254)),
+                  ),
+                ),
+              ],
+            );
+          },
+        );
+      },
     );
   }
 
