@@ -202,6 +202,49 @@ Future<void> _pickFiles(StateSetter setState) async {
 }
 
 
+
+Future<String> _getName(String lockedBy) async {
+  String url = '$apiUrl/get_name';
+
+  final Map<String, dynamic> data = {
+    'locked_by': lockedBy
+  };
+
+  try {
+    final response = await http.post(
+      Uri.parse(url),
+      headers: {
+        'Content-Type': 'application/json',
+        'supabase-url': supabaseUrl,
+        'supabase-key': supabaseKey,
+      },
+      body: json.encode(data),
+    );
+
+    if (response.statusCode == 200) {
+      final responseData = json.decode(response.body);
+      print('Request is locked: ${responseData['message']}');
+      
+      // Access the locked_by value returned from the server
+      String lockedByValue = responseData['locked_by'].toString();
+      print('locked_by value: $lockedByValue');
+      
+      // Return the locked_by value
+      return lockedByValue;
+    } else {
+      final errorData = json.decode(response.body);
+      print('Error: ${errorData['error']}');
+      // Return an error message or some default value
+      return 'Error: ${errorData['error']}';
+    }
+  } catch (error) {
+    print('Unexpected error: $error');
+    // Return a default error message
+    return 'Unexpected error occurred';
+  }
+}
+
+
 /*Future<void> _releasedRequest(String lockedBy, String requestId) async {
   String url = '$apiUrl/released_request_form';
 
@@ -1404,6 +1447,7 @@ Future<bool> _releasedRequest(String lockedBy, String requestId) async {
                                                                       bool isStated =await _releasedRequest(authState.uid.toString() ,request['request_id'].toString());
                                                                       if(isStated){
                                                                         String lockedId = await _lockedRequest(authState.uid.toString(), request['request_id'].toString());
+                                                                        String userName = await _getName(lockedId);
                                                                         if(lockedId==authState.uid.toString()){
                                                                           showApprovalDialog(
                                                                             context,
@@ -1413,10 +1457,11 @@ Future<bool> _releasedRequest(String lockedBy, String requestId) async {
                                                                                 .uid
                                                                                 .toString());
                                                                         }else{
-                                                                        _showMessage('Request is currently being processed by another user','Error');
+                                                                        _showMessage('Request is currently being processed by $userName','Error');
                                                                         }
                                                                       }else{
                                                                         String lockedId = await _lockedRequest(authState.uid.toString(), request['request_id'].toString());
+                                                                        String userName = await _getName(lockedId);
                                                                         if(lockedId==authState.uid.toString()){
                                                                           showApprovalDialog(
                                                                             context,
@@ -1426,7 +1471,7 @@ Future<bool> _releasedRequest(String lockedBy, String requestId) async {
                                                                                 .uid
                                                                                 .toString());
                                                                         }else{
-                                                                        _showMessage('Request is currently being processed by another user','Error');
+                                                                        _showMessage('Request is currently being processed by $userName','Error');
                                                                       }
                                                                       }
                                                                       
@@ -1449,6 +1494,7 @@ Future<bool> _releasedRequest(String lockedBy, String requestId) async {
                                                                       bool isStated =await _releasedRequest(authState.uid.toString() ,request['request_id'].toString());
                                                                       if(isStated){
                                                                         String lockedId = await _lockedRequest(authState.uid.toString(), request['request_id'].toString());
+                                                                        String userName = await _getName(lockedId);
                                                                         if(lockedId==authState.uid.toString()){
                                                                           showRejectDialog(context,
                                                                               request,
@@ -1458,12 +1504,13 @@ Future<bool> _releasedRequest(String lockedBy, String requestId) async {
                                                                                   .toString());
                                                                         
                                                                         }else{
-                                                                        _showMessage('Request is currently being processed by another user','Error');
+                                                                        _showMessage('Request is currently being processed by $userName','Error');
                                                                         }
                                                                       
                                                                       }else
                                                                       {
                                                                         String lockedId = await _lockedRequest(authState.uid.toString(), request['request_id'].toString());
+                                                                        String userName = await _getName(lockedId);
                                                                         if(lockedId==authState.uid.toString()){
                                                                           showRejectDialog(context,
                                                                               request,
@@ -1473,7 +1520,7 @@ Future<bool> _releasedRequest(String lockedBy, String requestId) async {
                                                                                   .toString());
                                                                         
                                                                         }else{
-                                                                        _showMessage('Request is currently being processed by another user','Error');
+                                                                        _showMessage('Request is currently being processed by $userName','Error');
                                                                         }
                                                                       }
                                                                       
