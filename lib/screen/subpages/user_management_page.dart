@@ -1228,7 +1228,7 @@ class _UserManagementPageState extends State<UserManagementPage> {
                                                 height:
                                                     4), // Add space between count and text
                                             const Text(
-                                              'ACTIVE USER',
+                                              'VERIFIED',
                                               style: TextStyle(
                                                 fontSize:
                                                     12, // Set font size to 12
@@ -1299,7 +1299,7 @@ class _UserManagementPageState extends State<UserManagementPage> {
                                                 height:
                                                     4), // Add space between count and text
                                             const Text(
-                                              'IN-ACTIVE USER',
+                                              'UNVERIFIED',
                                               style: TextStyle(
                                                 fontSize:
                                                     12, // Set font size to 12
@@ -1367,7 +1367,7 @@ class _UserManagementPageState extends State<UserManagementPage> {
                                                 height:
                                                     4), // Add space between count and text
                                             const Text(
-                                              'TOTAL USER',
+                                              'TOTAL',
                                               style: TextStyle(
                                                 fontSize:
                                                     12, // Set font size to 12
