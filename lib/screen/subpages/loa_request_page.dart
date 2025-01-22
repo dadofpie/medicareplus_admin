@@ -14,6 +14,7 @@ import 'package:medicare_admin_remaster/shared/api.dart';
 import 'dart:typed_data';
 import 'dart:html' as html;
 import 'package:cached_network_image/cached_network_image.dart';
+import 'package:http_parser/http_parser.dart'; 
 
 class LoaRequestPage extends StatefulWidget {
   const LoaRequestPage({super.key});
@@ -580,7 +581,7 @@ Future<bool> _releasedRequest(String lockedBy, String requestId) async {
                 }
                 requests = snapshot.data ?? []; // Use the data from the snapshot
                   
-                  filteredRequest = requests;
+                filteredRequest = requests;
 
                 filteredRequest = statusFilter.isEmpty
                     ? requests

@@ -49,6 +49,8 @@ class _UserManagementPageState extends State<UserManagementPage> {
   String? card_id;
   String? plan_id;
 
+  bool? statusFilter;
+
   GgxApi ggx= GgxApi();
 
   String? selectedRegion;
@@ -62,7 +64,10 @@ class _UserManagementPageState extends State<UserManagementPage> {
   List<City> cities = [];
   List<Barangay> barangays = [];
 
-  
+  int activeCount = 0;
+  int inactiveCount = 0;
+  int bothCount = 0;
+  int activeButtonIndex = -1;
 
   late ApiService _apiService;
 
@@ -129,6 +134,7 @@ class _UserManagementPageState extends State<UserManagementPage> {
   late Stream<List<Map<String, dynamic>>> requests;
   late Stream<List<Map<String, dynamic>>> memberData;
   List<PlatformFile> _selectedFiles = [];
+  List<Map<String, dynamic>> filteredRequests =[];
 
   bool _isFormValid = true; // State variable to track form validity
 
@@ -138,11 +144,8 @@ class _UserManagementPageState extends State<UserManagementPage> {
     super.initState();
     //fetchLoaRequest();
     fetchRegions(setState);
-    _apiService = ApiService(
-        'https://medicareplus-api.vercel.app');
+    _apiService = ApiService('https://medicareplus-api.vercel.app');
     requests = _apiService.streamMembers(supabaseUrl, supabaseKey);
-
-    print(member.length);
     
   }
 
@@ -150,7 +153,14 @@ class _UserManagementPageState extends State<UserManagementPage> {
   void dispose() {
     // Dispose of the controllers to avoid memory leaks
     super.dispose();
-  }  
+  } 
+
+
+  void filterByStatus(bool? status) {
+    setState(() {
+      statusFilter = status; // Update the filter
+    });
+  }
 
   int calculateAge(String birthday) {
   // Parse the date string to DateTime
@@ -166,6 +176,38 @@ class _UserManagementPageState extends State<UserManagementPage> {
 
     return age;
   }
+
+  void countStatuses(List<Map<String, dynamic>> members) {
+    // Reset counts
+    activeCount = 0;
+    inactiveCount = 0;
+    bothCount = 0;
+    // Count statuses
+    for (var member in members) {
+      if (member['is_active'] == true) {
+        activeCount++;  // Count true
+      } else if (member['is_active'] == false) {
+        inactiveCount++;  // Count false
+      }
+    }
+      // Sum both true and false values
+      bothCount= activeCount+inactiveCount;  
+  }
+
+
+  int countActiveRequests(List<Map<String, dynamic>> mylist) {
+  int activeCount = 0;
+  
+  // Iterate through the list of requests
+  for (var request in mylist) {
+    // Check if 'is_active' is true
+    if (request['is_active'] == true) {
+      activeCount++;
+    }
+  }
+  
+  return activeCount;
+}
 
   /*Future<void> fetchRegions() async {
     final response = await http.get(Uri.parse('https://psgc.gitlab.io/api/regions.json'));
@@ -878,12 +920,17 @@ class _UserManagementPageState extends State<UserManagementPage> {
               }
 
               final requestsList = snapshot.data!;
-              final List<Map<String, dynamic>> filteredRequests;
+               
               // Filtering 
               if(filterCriteria==''){
                 filteredRequests = requestsList;
+                 filteredRequests = statusFilter == true
+                ? requestsList.where((request) => request['is_active'] == true).toList()
+                : statusFilter == false
+                    ? requestsList.where((request) => request['is_active'] == false).toList()
+                    : requestsList;
               }else{
-                filteredRequests = requestsList.where((request) {
+                filteredRequests = filteredRequests.where((request) {
                 // Check which filter is applied and filter accordingly
                 if (filterCriteria == 'member') {
                   // Filter by first name or last name
@@ -923,11 +970,14 @@ class _UserManagementPageState extends State<UserManagementPage> {
                   final myContact = request['contact_no'].toString();
                   return myContact.contains(searchQuery);
                 } else {
+                  filteredRequests = requestsList;
                   return false;
                 }
               }).toList();
+
               }
               
+              countStatuses(requestsList);
             return Padding(
               padding: const EdgeInsets.all(8.0),
               child: Container(
@@ -951,14 +1001,15 @@ class _UserManagementPageState extends State<UserManagementPage> {
                       child: Row(
                         mainAxisAlignment: MainAxisAlignment.spaceBetween,
                         children: [
-                          const Padding(
+                           const Padding(
                             padding: EdgeInsets.all(8.0), // Padding around the text
                             child: Text(
                               '', // Replace with your desired text
                               style: TextStyle(
                                   fontSize: 20, // Adjust the font size as needed
                                   fontWeight: FontWeight.bold,
-                                  fontFamily: "Poppins-R" // Make the text bold
+                                  fontFamily: "Poppins-R", // Make the text bold
+                                  color: Color(0xff13322b)
                                   ),
                             ),
                           ),
@@ -1013,7 +1064,20 @@ class _UserManagementPageState extends State<UserManagementPage> {
                                       fontSize: 12, // Set smaller font size
                                       color: Colors.black, // Set text color to black
                                     ),
-                                    onChanged: _onSearchChanged,
+                                    onChanged: (value){
+                                      if(value.isNotEmpty){
+                                        _onSearchChanged(value);
+                                      }else{
+                                        setState(() {
+                                          filteredRequests = statusFilter == true
+                                            ? requestsList.where((request) => request['is_active'] == true).toList()
+                                            : statusFilter == false
+                                                ? requestsList.where((request) => request['is_active'] == false).toList()
+                                                : requestsList;
+                                        });
+                                      }
+                                      
+                                    },
                                   ),
                                 ),
                                 const SizedBox(
@@ -1105,6 +1169,223 @@ class _UserManagementPageState extends State<UserManagementPage> {
                     //     ],
                     //   ),
                     // ),
+
+                    Padding(
+                      padding: const EdgeInsets.only(left: 20, right: 20),
+                      child: Row(
+                              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                              children: [
+                                Expanded(
+                                  child: GestureDetector(
+                                    onTap: () {
+                                      setState(() {
+                                        if (activeButtonIndex == 0) {
+                                          // If the button is already active, show all requests
+                                          activeButtonIndex = -1; // Reset to inactive state
+                                          statusFilter = null;
+                                          filteredRequests = statusFilter == true
+                                            ? requestsList.where((request) => request['is_active'] == true).toList()
+                                            : statusFilter == false
+                                                ? requestsList.where((request) => request['is_active'] == false).toList()
+                                                : requestsList;
+                                         
+                                        } else {
+                                          // Set active button index to the first button and filter by approved status
+                                          activeButtonIndex = 0;
+                                          filterByStatus(true);
+                                        }
+                                      });
+                                    },
+                                    child: Container(
+                                      height: 120,
+                                      decoration: BoxDecoration(
+                                        color: const Color(
+                                            0xff66cce9), // Set background color
+                                        border: Border.all(
+                                          color: activeButtonIndex == 0
+                                              ? Colors.black
+                                              : Colors.grey,
+                                          width: 2,
+                                        ), // Outline based on active state
+                                        borderRadius: BorderRadius.circular(5),
+                                      ),
+                                      child: Center(
+                                        child: Column(
+                                          mainAxisAlignment: MainAxisAlignment
+                                              .center, // Center content vertically
+                                          children: [
+                                            Text(
+                                              '$activeCount', // Show loading count
+                                              style: const TextStyle(
+                                                //fontWeight: FontWeight.bold,
+                                                fontSize:
+                                                    30, // Set font size for count
+                                                color: Colors
+                                                    .black, // Set count text color to white
+                                              ),
+                                            ),
+                                            const SizedBox(
+                                                height:
+                                                    4), // Add space between count and text
+                                            const Text(
+                                              'ACTIVE USER',
+                                              style: TextStyle(
+                                                fontSize:
+                                                    12, // Set font size to 12
+                                                fontWeight: FontWeight
+                                                    .bold, // Make text bold
+                                                color: Colors
+                                                    .black, // Set text color to white
+                                              ),
+                                            ),
+                                          ],
+                                        ),
+                                      ),
+                                    ),
+                                  ),
+                                ),
+                      
+                                const SizedBox(width: 8.0), // Space between cards
+                                Expanded(
+                                  child: GestureDetector(
+                                    onTap: () {
+                                      setState(() {
+                                        if (activeButtonIndex == 1) {
+                                          // If the button is already active, show all requests
+                                          activeButtonIndex =
+                                              -1; // Reset to inactive state
+                                          statusFilter = null;
+                                          filteredRequests = statusFilter == true
+                                          ? requestsList.where((request) => request['is_active'] == true).toList()
+                                          : statusFilter == false
+                                              ? requestsList.where((request) => request['is_active'] == false).toList()
+                                              : requestsList;
+                                        } else {
+                                          // Set active button index to the second button and filter by pending status
+                                          activeButtonIndex = 1;
+                                          filterByStatus(false);
+                                        }
+                                      });
+                                    },
+                                    child: Container(
+                                      height: 120,
+                                      decoration: BoxDecoration(
+                                        color: const Color(
+                                            0xfffec316), // Set background color
+                                        border: Border.all(
+                                          color: activeButtonIndex == 1
+                                              ? Colors.black
+                                              : Colors.grey,
+                                          width: 2,
+                                        ), // Outline based on active state
+                                        borderRadius: BorderRadius.circular(5),
+                                      ),
+                                      child: Center(
+                                        child: Column(
+                                          mainAxisAlignment: MainAxisAlignment
+                                              .center, // Center content vertically
+                                          children: [
+                                            Text(
+                                              '$inactiveCount', // Show loading count
+                                              style: const TextStyle(
+                                                //fontWeight: FontWeight.bold,
+                                                fontSize:
+                                                    30, // Set font size for count
+                                                color: Colors
+                                                    .black, // Set count text color to white
+                                              ),
+                                            ),
+                                            const SizedBox(
+                                                height:
+                                                    4), // Add space between count and text
+                                            const Text(
+                                              'IN-ACTIVE USER',
+                                              style: TextStyle(
+                                                fontSize:
+                                                    12, // Set font size to 12
+                                                fontWeight: FontWeight
+                                                    .bold, // Make text bold
+                                                color: Colors
+                                                    .black, // Set text color to white
+                                              ),
+                                            ),
+                                          ],
+                                        ),
+                                      ),
+                                    ),
+                                  ),
+                                ),
+                      
+                                const SizedBox(width: 8.0), // Space between cards
+                                Expanded(
+                                  child: GestureDetector(
+                                    onTap: () {
+                                      setState(() {
+                                        filteredRequests = requestsList;
+                                        if (activeButtonIndex == 2) {
+                                          // If the button is already active, show all requests
+                                          activeButtonIndex =-1; // Reset to inactive state
+                                          // Call function to show all requests
+                                          statusFilter = null;
+                                          filteredRequests = requestsList;
+                                        } else {
+                                          // Set active button index to the third button and filter by rejected status
+                                          activeButtonIndex = 2;
+                                          filterByStatus(null);
+                                        }
+                                      });
+                                    },
+                                    child: Container(
+                                      height: 120,
+                                      decoration: BoxDecoration(
+                                        color: const Color(
+                                            0xfff0516e), // Set background color
+                                        border: Border.all(
+                                          color: activeButtonIndex == 2
+                                              ? Colors.black
+                                              : Colors.grey,
+                                          width: 2,
+                                        ), // Outline based on active state
+                                        borderRadius: BorderRadius.circular(5),
+                                      ),
+                                      child: Center(
+                                        child: Column(
+                                          mainAxisAlignment: MainAxisAlignment
+                                              .center, // Center content vertically
+                                          children: [
+                                            Text(
+                                              '$bothCount', // Show loading count
+                                              style: const TextStyle(
+                                                //fontWeight: FontWeight.bold,
+                                                fontSize:
+                                                    30, // Set font size for count
+                                                color: Colors
+                                                    .black, // Set count text color to white
+                                              ),
+                                            ),
+                                            const SizedBox(
+                                                height:
+                                                    4), // Add space between count and text
+                                            const Text(
+                                              'TOTAL USER',
+                                              style: TextStyle(
+                                                fontSize:
+                                                    12, // Set font size to 12
+                                                fontWeight: FontWeight
+                                                    .bold, // Make text bold
+                                                color: Colors
+                                                    .black, // Set text color to white
+                                              ),
+                                            ),
+                                          ],
+                                        ),
+                                      ),
+                                    ),
+                                  ),
+                                ),
+                              ],
+                      ),
+                    ),
                     const SizedBox(height: 10),
                     // Table headers
                     Padding(
