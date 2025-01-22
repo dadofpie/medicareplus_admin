@@ -184,9 +184,9 @@ class _UserManagementPageState extends State<UserManagementPage> {
     bothCount = 0;
     // Count statuses
     for (var member in members) {
-      if (member['is_active'] == true) {
+      if (member['is_verified'] == true) {
         activeCount++;  // Count true
-      } else if (member['is_active'] == false) {
+      } else if (member['is_verified'] == false) {
         inactiveCount++;  // Count false
       }
     }
@@ -201,7 +201,7 @@ class _UserManagementPageState extends State<UserManagementPage> {
   // Iterate through the list of requests
   for (var request in mylist) {
     // Check if 'is_active' is true
-    if (request['is_active'] == true) {
+    if (request['is_verified'] == true) {
       activeCount++;
     }
   }
@@ -925,9 +925,9 @@ class _UserManagementPageState extends State<UserManagementPage> {
               if(filterCriteria==''){
                 filteredRequests = requestsList;
                  filteredRequests = statusFilter == true
-                ? requestsList.where((request) => request['is_active'] == true).toList()
+                ? requestsList.where((request) => request['is_verified'] == true).toList()
                 : statusFilter == false
-                    ? requestsList.where((request) => request['is_active'] == false).toList()
+                    ? requestsList.where((request) => request['is_verified'] == false).toList()
                     : requestsList;
               }else{
                 filteredRequests = filteredRequests.where((request) {
@@ -1070,9 +1070,9 @@ class _UserManagementPageState extends State<UserManagementPage> {
                                       }else{
                                         setState(() {
                                           filteredRequests = statusFilter == true
-                                            ? requestsList.where((request) => request['is_active'] == true).toList()
+                                            ? requestsList.where((request) => request['is_verified'] == true).toList()
                                             : statusFilter == false
-                                                ? requestsList.where((request) => request['is_active'] == false).toList()
+                                                ? requestsList.where((request) => request['is_verified'] == false).toList()
                                                 : requestsList;
                                         });
                                       }
@@ -1184,9 +1184,9 @@ class _UserManagementPageState extends State<UserManagementPage> {
                                           activeButtonIndex = -1; // Reset to inactive state
                                           statusFilter = null;
                                           filteredRequests = statusFilter == true
-                                            ? requestsList.where((request) => request['is_active'] == true).toList()
+                                            ? requestsList.where((request) => request['is_verified'] == true).toList()
                                             : statusFilter == false
-                                                ? requestsList.where((request) => request['is_active'] == false).toList()
+                                                ? requestsList.where((request) => request['is_verified'] == false).toList()
                                                 : requestsList;
                                          
                                         } else {
@@ -1256,9 +1256,9 @@ class _UserManagementPageState extends State<UserManagementPage> {
                                               -1; // Reset to inactive state
                                           statusFilter = null;
                                           filteredRequests = statusFilter == true
-                                          ? requestsList.where((request) => request['is_active'] == true).toList()
+                                          ? requestsList.where((request) => request['is_verified'] == true).toList()
                                           : statusFilter == false
-                                              ? requestsList.where((request) => request['is_active'] == false).toList()
+                                              ? requestsList.where((request) => request['is_verified'] == false).toList()
                                               : requestsList;
                                         } else {
                                           // Set active button index to the second button and filter by pending status

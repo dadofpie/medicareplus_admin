@@ -94406,7 +94406,7 @@ r.p2=s
 r.cR=s.nS("https://hsdwccwygehmawjdyzkr.supabase.co",u.P)},
 l(){this.aC()},
 nb(a){this.N(new A.aF4(this,a))},
-Iz(a){var s,r,q,p=this,o="is_active"
+Iz(a){var s,r,q,p=this,o="is_verified"
 p.ok=p.k4=p.k3=0
 for(s=J.aA(a);s.A();){r=s.gJ(s)
 q=J.aa(r)
@@ -95079,10 +95079,10 @@ d=A.cf(B.k,1)
 return new A.aB(B.aa,A.aJ(c,A.bO(A.a([B.aB,new A.aB(B.oh,p,c),new A.aB(B.cl,b,c),B.a6,new A.aB(B.cl,A.aJ(c,A.b6(A.a([l,j,i,h,g,f,A.a5(A.cI(c,A.aJ(c,A.ag("Member Account Status",c,c,c,c,A.cx(c,c,m?B.f:B.k,c,c,c,c,c,c,c,c,c,c,c,B.ab,c,c,!0,c,c,c,c,c,c,c,c),c,c,c),B.o,c,c,new A.bc(e,c,d,c,c,c,B.C),c,c,c,B.aa,c,c,c),B.D,!1,c,c,c,c,c,c,c,c,c,c,c,c,c,new A.aEJ(s),c,c,c,c,c,c),1),A.a5(A.aJ(c,B.lU,B.o,c,c,new A.bc(c,c,A.cf(B.k,1),B.mJ,c,c,B.C),c,c,c,B.aa,c,c,c),1)],o),B.l,B.at,B.m),B.o,c,c,new A.bc(c,c,k,n,c,c,B.C),c,c,c,c,c,c,c),c),B.AB,A.a5(A.Pc(!0,!0,!0,c,B.L,c,B.D,new A.aEK(s),J.c1(s.dl),c,B.dp,c,c,c,c,!1,B.a_,c,!1),1)],o),B.l,B.r,B.m),B.o,c,c,new A.bc(c,c,r,q,c,c,B.C),c,c,c,c,c,c,c),c)},
 $S:13}
 A.aED.prototype={
-$1(a){return J.c(J.w(a,"is_active"),!0)},
+$1(a){return J.c(J.w(a,"is_verified"),!0)},
 $S:57}
 A.aEE.prototype={
-$1(a){return J.c(J.w(a,"is_active"),!1)},
+$1(a){return J.c(J.w(a,"is_verified"),!1)},
 $S:57}
 A.aEF.prototype={
 $1(a){var s,r,q,p,o,n,m,l,k=null,j=this.a,i=j.bt
@@ -95130,10 +95130,10 @@ if(q===!1){q=J.lH(s,new A.aEn())
 q=A.a7(q,!0,q.$ti.i("n.E"))}else q=s}r.dl=q},
 $S:0}
 A.aEm.prototype={
-$1(a){return J.c(J.w(a,"is_active"),!0)},
+$1(a){return J.c(J.w(a,"is_verified"),!0)},
 $S:57}
 A.aEn.prototype={
-$1(a){return J.c(J.w(a,"is_active"),!1)},
+$1(a){return J.c(J.w(a,"is_verified"),!1)},
 $S:57}
 A.aEM.prototype={
 $2(a,b){var s,r=null
