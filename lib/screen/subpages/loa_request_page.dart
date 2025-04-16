@@ -14,7 +14,8 @@ import 'package:medicare_admin_remaster/shared/api.dart';
 import 'dart:typed_data';
 import 'dart:html' as html;
 import 'package:cached_network_image/cached_network_image.dart';
-import 'package:http_parser/http_parser.dart'; 
+import 'package:http_parser/http_parser.dart';
+import 'package:supabase_flutter/supabase_flutter.dart' as supabase;
 
 class LoaRequestPage extends StatefulWidget {
   const LoaRequestPage({super.key});
@@ -33,7 +34,7 @@ class _LoaRequestPageState extends State<LoaRequestPage> {
   int approvedCount = 0;
   int rejectCount = 0;
   int cancelledCount = 0;
-  late Stream<List<Map<String, dynamic>>> _members;
+  Stream<List<Map<String, dynamic>>>? _members;
   List<Map<String, dynamic>> requests = [];
   List<Map<String, dynamic>> filteredRequest = [];
   List<PlatformFile>? _selectedFiles;
@@ -50,11 +51,17 @@ class _LoaRequestPageState extends State<LoaRequestPage> {
   @override
   void initState() {
     super.initState();
-    _apiService = ApiService(
-        'https://medicareplus-api.vercel.app'); // Replace with your actual API URL
+    _apiService = ApiService('https://medicareplus-api.vercel.app'); // Replace with your actual API URL
     _members = _apiService.streamAllRequest(supabaseUrl, supabaseKey);
     // Initialize the service with your endpoint
   }
+
+  @override
+  void dispose() {
+    supabase.Supabase.instance.client.removeAllChannels();
+    super.dispose();
+  }
+
 
   void filterByStatus(String status) {
     setState(() {
