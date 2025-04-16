@@ -1,9 +1,14 @@
 import 'dart:convert';
 import 'package:http/http.dart' as http;
 import 'dart:async';
+import 'package:supabase_flutter/supabase_flutter.dart' as supabase;
 
 class ApiService {
   final String apiUrl;
+  final StreamController<List<Map<String, dynamic>>> _controller =
+      StreamController<List<Map<String, dynamic>>>.broadcast();
+
+  List<Map<String, dynamic>> _requests = [];
 
   ApiService(this.apiUrl);
 
@@ -27,7 +32,7 @@ class ApiService {
     }
   }
 
-  Stream<List<Map<String, dynamic>>> streamAllRequest(String supabaseUrl, String supabaseKey) async* {
+  /*Stream<List<Map<String, dynamic>>> streamAllRequest(String supabaseUrl, String supabaseKey) async* {
     while (true) {
       try {
         final members = await fetchAllMembers(supabaseUrl, supabaseKey);
@@ -39,7 +44,69 @@ class ApiService {
 
       await Future.delayed(const Duration(seconds: 2)); // Refresh every 10 seconds
     }
+  }*/
+
+    Stream<List<Map<String, dynamic>>> streamAllRequest(String supabaseUrl, String supabaseKey) {
+    // Initial fetch
+    fetchAllMembers(supabaseUrl, supabaseKey).then((members) {
+      _requests = members;
+      _controller.add(_requests);
+    });
+
+
+    // Real-time changes from Supabase
+    supabase.Supabase.instance.client
+        .channel('public:mp_form_request_table')
+        .onPostgresChanges(
+          event: supabase.PostgresChangeEvent.insert,
+          table: 'mp_form_request_table',
+          callback: (payload) async {
+            // First, store the current _requests data
+            final oldRequests = List<Map<String, dynamic>>.from(_requests);
+
+            // Call fetchAllMembers again to get the latest data
+            final freshData = await fetchAllMembers(supabaseUrl, supabaseKey);
+
+            // Ensure freshData is properly typed
+            final freshDataTyped = List<Map<String, dynamic>>.from(freshData);
+
+            // Combine the old and new data (to ensure no loss)
+            final combinedData = List<Map<String, dynamic>>.from(freshDataTyped)..addAll(oldRequests);
+
+            // Update the stream with the combined data
+            _controller.add(combinedData);
+          },
+        )
+        .onPostgresChanges(
+          event: supabase.PostgresChangeEvent.update,
+          table: 'mp_form_request_table',
+          callback: (payload) {
+            final updatedRecord = Map<String, dynamic>.from(payload.newRecord);
+            updatedRecord['status'] = updatedRecord['form_status'] ?? '';
+            updatedRecord['locked_by'] = updatedRecord['locked_by'] ?? '';
+            final index = _requests.indexWhere((m) => m['request_id'] == updatedRecord['request_id']);
+            if (index != -1) {
+              _requests[index]['status'] = updatedRecord['status'];
+              _requests[index]['locked_by'] = updatedRecord['locked_by'];
+              print('Updated record: $updatedRecord');
+              _controller.add(List.from(_requests));
+            }
+          },
+        )
+        .onPostgresChanges(
+          event: supabase.PostgresChangeEvent.delete,
+          table: 'mp_form_request_table',
+          callback: (payload) {
+            final deletedRecord = payload.oldRecord;
+            _requests.removeWhere((m) => m['request_id'] == deletedRecord['request_id']);
+            _controller.add(List.from(_requests));
+          },
+        )
+        .subscribe();
+
+    return _controller.stream;
   }
+
 
   Stream<List<Map<String, dynamic>>> streamMembers(String supabaseUrl, String supabaseKey) async* {
     var apiUrl ='https://medicareplus-api.vercel.app';
