@@ -74,6 +74,43 @@ class _LoaRequestPageState extends State<LoaRequestPage> {
     return formatter.format(date);
   }
 
+
+  Future<void> logUserAction(
+   String userId,
+   String tableName,
+   String actionType,
+   String actionDetails,
+  ) async {
+    final uri = Uri.parse('https://medicareplus-api.vercel.app/api/admin/record_action');
+
+    try {
+      final response = await http.post(
+        uri,
+        headers: {
+          'Content-Type': 'application/json',
+          'supabase-url': supabaseUrl,
+          'supabase-key': supabaseKey,
+        },
+        body: jsonEncode({
+          'user_id': userId,
+          'table_name': tableName,
+          'action_type': actionType,
+          'action_details': actionDetails,
+        }),
+      );
+
+      if (response.statusCode == 200) {
+        final data = jsonDecode(response.body);
+        print('Action logged: ${data['message']}');
+      } else {
+        print('Failed to log action. Status code: ${response.statusCode}');
+        print('Response: ${response.body}');
+      }
+    } catch (e) {
+      print('Error logging action: $e');
+    }
+  }
+
   void countStatuses(List<Map<String, dynamic>> members) {
     // Reset counts
     pendingCount = 0;
@@ -389,12 +426,14 @@ Future<bool> _releasedRequest(String lockedBy, String requestId) async {
 
         if (response.statusCode == 403) {
           // Handle locked request
+          await logUserAction(userId,'mp_form_request_table','Update','Error $requestId');
           print('Update failed: ${data['error']}');
           // Show a message to the user about the locked request
           setState(() {
             message = data['error'];
           });
         } else {
+          await logUserAction(userId,'mp_form_request_table','Update','Error $requestId');
           print('Update failed: ${response.statusCode}');
         }
         return false;
@@ -1944,12 +1983,15 @@ Future<bool> _releasedRequest(String lockedBy, String requestId) async {
                             rejectionReason,
                           );
 
+                          
+
                           setState(() {
                             isLoading =
                                 false; // Reset loading state after the operation
                           });
 
                           if (isStated) {
+                            await logUserAction(uid,'mp_form_request_table','Update','Reject ${request['request_id'].toString()}');
                             // Close all dialogs and show the success message
                             Navigator.of(context).popUntil(
                                 (route) => route.isFirst); // Close all modals
@@ -2092,13 +2134,13 @@ Future<bool> _releasedRequest(String lockedBy, String requestId) async {
                           uid,
                           'forms',
                           '');
-              
                       setState(() {
                         _selectedFiles = null;
                         _isLoading = false; // Stop loading
                       });
                         
                       if (isStated) {
+                        await logUserAction(uid,'mp_form_request_table','Update','Approved ${request['request_id'].toString()}');
                         Navigator.of(context).popUntil((route) => route.isFirst);
                         _showMessage(
                             'LOA Request ID: ${request['request_id']} has been approved',
