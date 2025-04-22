@@ -224,6 +224,7 @@ Future<void> _pickFiles(StateSetter setState) async {
     );
 
     if (response.statusCode == 200) {
+      await logUserAction(lockedBy,'mp_form_request_table','Update','Locked application # $requestId');
       final responseData = json.decode(response.body);
       print('Request is locked: ${responseData['message']}');
       
@@ -234,6 +235,7 @@ Future<void> _pickFiles(StateSetter setState) async {
       // Return the locked_by value
       return lockedByValue;
     } else {
+      await logUserAction(lockedBy,'mp_form_request_table','Update','Error on locking application # $requestId');
       final errorData = json.decode(response.body);
       print('Error: ${errorData['error']}');
       // Return an error message or some default value
@@ -342,10 +344,12 @@ Future<bool> _releasedRequest(String lockedBy, String requestId) async {
     );
 
     if (response.statusCode == 200) {
+      await logUserAction(lockedBy,'mp_form_request_table','Update','Released application # $requestId');
       final responseData = json.decode(response.body);
       print('Request is locked: ${responseData['message']}');
       return true;  // Request processed successfully
     } else {
+      await logUserAction(lockedBy,'mp_form_request_table','Update','Error on releasing application # $requestId');
       final errorData = json.decode(response.body);
       print('Error: ${errorData['error']}');
       return false;  // Error processing the request
