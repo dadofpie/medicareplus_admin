@@ -365,92 +365,101 @@ Future<bool> _releasedRequest(String lockedBy, String requestId) async {
 
   Future<bool> _updateRequestForm(String requestId, String status, String name,
       String userId, String bucketName, String rejectReason) async {
-    var request = http.MultipartRequest(
-        'POST',
-        Uri.parse(
-            'https://medicareplus-api.vercel.app/api/admin/update_request_form'));
-
-    request.headers.addAll({
-      'supabase-url': supabaseUrl,
-      'supabase-key': supabaseKey,
-    });
-
-    request.fields['request_id'] = requestId; // Set your request ID
-    request.fields['form_status'] = status; // Set your form status
-    request.fields['updated_by'] = userId; // Set who updated it
-    request.fields['date_update'] = DateTime.now().toIso8601String(); // Current date
-    request.fields['bucket_name'] = bucketName; // Set your bucket name
-    request.fields['user_name'] = name; // Set the user name
-    request.fields['reject_reason'] = rejectReason;
-
-    // Check if we have selected files and process them
-    if (bucketName.isNotEmpty) {
-      for (var file in _selectedFiles!) {
-        // Check if we're running in the web environment
-        // Create a File instance from PlatformFile
-        final fileBytes = await _getFileBytes(file);
-
-        // Add the file to the request
-        request.files.add(http.MultipartFile.fromBytes(
-          'files',
-          fileBytes,
-          filename: file.name, // Use the name from PlatformFile
-        ));
-      }
-    }
-
-    /*try {
-      var response = await request.send();
-
-      if (response.statusCode == 200) {
-        final responseData = await response.stream.bytesToString();
-        final data = json.decode(responseData);
-        print('Update successful: $data');
-        return true;
-      } else {
-        print('Update failed: ${response.statusCode}');
-        return false;
-      }
-    } catch (e) {
-      print('Error occurred while updating: $e');
-      return false;
-    }*/
     try {
-      var response = await request.send().timeout(const Duration(seconds: 10));
+      final dio = Dio();
+      
+      // Prepare FormData for multipart request
+      final formData = FormData.fromMap({
+        'request_id': requestId,
+        'form_status': status,
+        'updated_by': userId,
+        'date_update': DateTime.now().toIso8601String(),
+        'bucket_name': bucketName,
+        'user_name': name,
+        'reject_reason': rejectReason,
+      });
+
+      // Add files if bucket name is provided and files are selected
+      if (bucketName.isNotEmpty && _selectedFiles != null && _selectedFiles!.isNotEmpty) {
+        for (var file in _selectedFiles!) {
+          // Use file bytes directly - PlatformFile already has bytes available
+          if (file.bytes != null) {
+            formData.files.add(MapEntry(
+              'files',
+              MultipartFile.fromBytes(
+                file.bytes!,
+                filename: file.name,
+              ),
+            ));
+          }
+        }
+      }
+
+      // Make the request with Dio
+      final response = await dio.post(
+        'https://medicareplus-api.vercel.app/api/admin/update_request_form',
+        data: formData,
+        options: Options(
+          headers: {
+            'supabase-url': supabaseUrl,
+            'supabase-key': supabaseKey,
+          },
+          sendTimeout: const Duration(seconds: 10),
+          receiveTimeout: const Duration(seconds: 10),
+        ),
+      );
 
       if (response.statusCode == 200) {
-        final responseData = await response.stream.bytesToString();
-        final data = json.decode(responseData);
+        final data = response.data;
         print('Update successful: $data');
         return true;
       } else {
         // Handle specific error cases based on status code or response
-        final responseData = await response.stream.bytesToString();
-        final data = json.decode(responseData);
+        final data = response.data;
 
         if (response.statusCode == 403) {
           // Handle locked request
-          await logUserAction(userId,'mp_form_request_table','Update','Error $requestId');
+          await logUserAction(userId, 'mp_form_request_table', 'Update', 'Error $requestId');
           print('Update failed: ${data['error']}');
           // Show a message to the user about the locked request
           setState(() {
-            message = data['error'];
+            message = data['error'] ?? 'Request is locked';
           });
         } else {
-          await logUserAction(userId,'mp_form_request_table','Update','Error $requestId');
+          await logUserAction(userId, 'mp_form_request_table', 'Update', 'Error $requestId');
           print('Update failed: ${response.statusCode}');
         }
         return false;
       }
-    } on TimeoutException catch (_) {
-      // Handle timeout (e.g., show a timeout message)
-      setState(() {
-        Navigator.of(context).popUntil((route) => route.isFirst);
-        _showMessage('The request timed out. Please try again later.',
-          'Connection timeout!');  
-      });
-      return false;
-      
+    } on DioException catch (e) {
+      // Handle Dio-specific errors
+      if (e.type == DioExceptionType.connectionTimeout || 
+          e.type == DioExceptionType.receiveTimeout ||
+          e.type == DioExceptionType.sendTimeout) {
+        // Handle timeout
+        setState(() {
+          Navigator.of(context).popUntil((route) => route.isFirst);
+          _showMessage('The request timed out. Please try again later.',
+              'Connection timeout!');
+        });
+        return false;
+      } else if (e.response != null) {
+        // Handle HTTP error responses
+        final data = e.response?.data;
+        if (e.response?.statusCode == 403) {
+          await logUserAction(userId, 'mp_form_request_table', 'Update', 'Error $requestId');
+          setState(() {
+            message = data?['error'] ?? 'Request is locked';
+          });
+        } else {
+          await logUserAction(userId, 'mp_form_request_table', 'Update', 'Error $requestId');
+          print('Update failed: ${e.response?.statusCode}');
+        }
+        return false;
+      } else {
+        print('Error occurred while updating: ${e.message}');
+        return false;
+      }
     } catch (e) {
       print('Error occurred while updating: $e');
       return false;
