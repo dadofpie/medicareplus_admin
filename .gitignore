@@ -43,5 +43,9 @@ app.*.map.json
 /android/app/profile
 /android/app/release
 
+# Build artifacts (keep build/web/ for pre-built output)
+build/*
+!build/web/
+
 # Local environment secrets
 /env/dev.json
