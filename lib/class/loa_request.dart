@@ -1,32 +1,40 @@
 import 'dart:convert';
 import 'package:http/http.dart' as http;
 import 'dart:async';
+import 'package:medicare_admin_remaster/services/cache_service.dart';
+import 'package:medicare_admin_remaster/shared/api.dart';
 import 'package:supabase_flutter/supabase_flutter.dart' as supabase;
 
 class ApiService {
   final String apiUrl;
   final StreamController<List<Map<String, dynamic>>> _controller =
       StreamController<List<Map<String, dynamic>>>.broadcast();
+  bool _isPollingStarted = false;
 
   List<Map<String, dynamic>> _requests = [];
 
   ApiService(this.apiUrl);
 
-  Future<List<Map<String, dynamic>>> fetchAllMembers(String supabaseUrl, String supabaseKey) async {
+  static void signalMembersUpdated() {
+    CacheService.instance.refreshMembers();
+  }
+
+  static void signalLoaUpdated() {
+    CacheService.instance.refreshLoaRequests();
+  }
+
+  Future<List<Map<String, dynamic>>> fetchAllMembers(
+      String supabaseUrl, String supabaseKey) async {
     final response = await http.post(
-      Uri.parse(apiUrl + '/api/admin/get_loa_request'),
-      headers: {
-        "supabase-url": supabaseUrl,
-        "supabase-key": supabaseKey,
-      },
+      Uri.parse('$apiUrl/api/admin/get_loa_request'),
+      headers: buildApiHeaders(includeContentType: false),
     );
 
     if (response.statusCode == 200) {
       final Map<String, dynamic> data = json.decode(response.body);
-      
+
       // Ensure the type safety by converting to List<Map<String, dynamic>>
       return List<Map<String, dynamic>>.from(data['loa_request'] ?? []);
-      
     } else {
       throw Exception('Failed to load loa');
     }
@@ -46,79 +54,78 @@ class ApiService {
     }
   }*/
 
-    Stream<List<Map<String, dynamic>>> streamAllRequest(String supabaseUrl, String supabaseKey) {
+  Stream<List<Map<String, dynamic>>> streamAllRequest(
+      String supabaseUrl, String supabaseKey) {
     // Initial fetch
     fetchAllMembers(supabaseUrl, supabaseKey).then((members) {
       _requests = members;
       _controller.add(_requests);
     });
 
-
-    // Real-time changes from Supabase
-    supabase.Supabase.instance.client
-        .channel('public:mp_form_request_table')
-        .onPostgresChanges(
-          event: supabase.PostgresChangeEvent.insert,
-          table: 'mp_form_request_table',
-          callback: (payload) async {
-            // First, store the current _requests data
-            final oldRequests = List<Map<String, dynamic>>.from(_requests);
-
-            // Call fetchAllMembers again to get the latest data
-            final freshData = await fetchAllMembers(supabaseUrl, supabaseKey);
-
-            // Ensure freshData is properly typed
-            final freshDataTyped = List<Map<String, dynamic>>.from(freshData);
-
-            // Combine the old and new data (to ensure no loss)
-            final combinedData = List<Map<String, dynamic>>.from(freshDataTyped)..addAll(oldRequests);
-
-            // Update the stream with the combined data
-            _controller.add(combinedData);
-          },
-        )
-        .onPostgresChanges(
-          event: supabase.PostgresChangeEvent.update,
-          table: 'mp_form_request_table',
-          callback: (payload) {
-            final updatedRecord = Map<String, dynamic>.from(payload.newRecord);
-            updatedRecord['status'] = updatedRecord['form_status'] ?? '';
-            updatedRecord['locked_by'] = updatedRecord['locked_by'] ?? '';
-            final index = _requests.indexWhere((m) => m['request_id'] == updatedRecord['request_id']);
-            if (index != -1) {
-              _requests[index]['status'] = updatedRecord['status'];
-              _requests[index]['locked_by'] = updatedRecord['locked_by'];
-              print('Updated record: $updatedRecord');
+    if (useSupabase) {
+      // Real-time changes from Supabase
+      supabase.Supabase.instance.client
+          .channel('public:mp_form_request_table')
+          .onPostgresChanges(
+            event: supabase.PostgresChangeEvent.insert,
+            table: 'mp_form_request_table',
+            callback: (payload) async {
+              final freshData = await fetchAllMembers(supabaseUrl, supabaseKey);
+              _requests = List<Map<String, dynamic>>.from(freshData);
               _controller.add(List.from(_requests));
-            }
-          },
-        )
-        .onPostgresChanges(
-          event: supabase.PostgresChangeEvent.delete,
-          table: 'mp_form_request_table',
-          callback: (payload) {
-            final deletedRecord = payload.oldRecord;
-            _requests.removeWhere((m) => m['request_id'] == deletedRecord['request_id']);
-            _controller.add(List.from(_requests));
-          },
-        )
-        .subscribe();
+            },
+          )
+          .onPostgresChanges(
+            event: supabase.PostgresChangeEvent.update,
+            table: 'mp_form_request_table',
+            callback: (payload) {
+              final updatedRecord =
+                  Map<String, dynamic>.from(payload.newRecord);
+              updatedRecord['status'] = updatedRecord['form_status'] ?? '';
+              updatedRecord['locked_by'] = updatedRecord['locked_by'] ?? '';
+              final index = _requests.indexWhere(
+                (m) => m['request_id'] == updatedRecord['request_id'],
+              );
+              if (index != -1) {
+                _requests[index]['status'] = updatedRecord['status'];
+                _requests[index]['locked_by'] = updatedRecord['locked_by'];
+                _controller.add(List.from(_requests));
+              }
+            },
+          )
+          .onPostgresChanges(
+            event: supabase.PostgresChangeEvent.delete,
+            table: 'mp_form_request_table',
+            callback: (payload) {
+              final deletedRecord = payload.oldRecord;
+              _requests.removeWhere(
+                (m) => m['request_id'] == deletedRecord['request_id'],
+              );
+              _controller.add(List.from(_requests));
+            },
+          )
+          .subscribe();
+    } else if (!_isPollingStarted) {
+      _isPollingStarted = true;
+      Timer.periodic(const Duration(seconds: 5), (_) async {
+        try {
+          final members = await fetchAllMembers(supabaseUrl, supabaseKey);
+          _requests = members;
+          _controller.add(List<Map<String, dynamic>>.from(_requests));
+        } catch (_) {}
+      });
+    }
 
     return _controller.stream;
   }
 
-
-  Stream<List<Map<String, dynamic>>> streamMembers(String supabaseUrl, String supabaseKey) async* {
-    var apiUrl ='https://medicareplus-api.vercel.app';
+  Stream<List<Map<String, dynamic>>> streamMembers(
+      String supabaseUrl, String supabaseKey) async* {
     while (true) {
       try {
         final response = await http.get(
           Uri.parse('$apiUrl/api/admin/get_all_members'),
-          headers: {
-            'Content-Type': 'application/json',
-            'supabase-url': supabaseUrl,
-            'supabase-key': supabaseKey,
-          },
+          headers: buildApiHeaders(),
         );
 
         if (response.statusCode == 200) {
@@ -132,7 +139,8 @@ class ApiService {
         yield []; // Emit an empty list on error
       }
 
-      await Future.delayed(const Duration(seconds: 5)); // Refresh every 5 seconds
+      await Future.delayed(
+          const Duration(seconds: 5)); // Refresh every 5 seconds
     }
   }
 
@@ -192,50 +200,41 @@ class ApiService {
   yield allMembers;
 }*/
 
+  Future<List<Map<String, dynamic>>> getMemberById(
+      int customerId, String supabaseUrl, String supabaseKey) async {
+    var myUrl = apiUrl;
 
+    try {
+      final response = await http.post(
+        Uri.parse('$myUrl/api/admin/get_member_by_id?customer_id=$customerId'),
+        headers: buildApiHeaders(),
+        body: json.encode({
+          'customer_id': customerId, // Send customer_id in the request body
+        }),
+      );
 
-Future<List<Map<String, dynamic>>> getMemberById(int customerId, String supabaseUrl, String supabaseKey) async {
-  var myUrl = 'https://medicareplus-api.vercel.app';
+      if (response.statusCode == 200) {
+        final data = json.decode(response.body);
 
-  try {
-    final response = await http.post(
-      Uri.parse('$myUrl/api/admin/get_member_by_id?customer_id=$customerId'),
-      headers: {
-        'Content-Type': 'application/json',
-        'supabase-url': supabaseUrl,
-        'supabase-key': supabaseKey,
-      },
-      body: json.encode({
-        'customer_id': customerId,  // Send customer_id in the request body
-      }),
-    );
+        //print('Response data: $data');  // Debugging output
 
-    if (response.statusCode == 200) {
-      final data = json.decode(response.body);
-
-      //print('Response data: $data');  // Debugging output
-
-      // Check if 'members' is a list or a map
-      if (data['members'] is List) {
-        // If it's already a list, return it as a List<Map<String, dynamic>>
-        return List<Map<String, dynamic>>.from(data['members']);
-      } else if (data['members'] is Map) {
-        // If it's a map (single member), convert it to a list with that single map
-        return [data['members']];
+        // Check if 'members' is a list or a map
+        if (data['members'] is List) {
+          // If it's already a list, return it as a List<Map<String, dynamic>>
+          return List<Map<String, dynamic>>.from(data['members']);
+        } else if (data['members'] is Map) {
+          // If it's a map (single member), convert it to a list with that single map
+          return [data['members']];
+        } else {
+          // Return an empty list if 'members' is neither a List nor a Map
+          return [];
+        }
       } else {
-        // Return an empty list if 'members' is neither a List nor a Map
-        return [];
+        throw Exception('Failed to load member');
       }
-    } else {
-      throw Exception('Failed to load member');
+    } catch (e) {
+      print('Error: $e');
+      return []; // Return an empty list on error
     }
-  } catch (e) {
-    print('Error: $e');
-    return []; // Return an empty list on error
   }
-}
-
-
-
-
 }

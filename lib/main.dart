@@ -4,16 +4,19 @@ import 'package:medicare_admin_remaster/screen/login_page.dart';
 import 'package:medicare_admin_remaster/screen/subpages/admin_interface/domain/repositories/admin_repository.dart';
 import 'package:medicare_admin_remaster/screen/subpages/admin_interface/domain/usecases/fetch_all_admin.dart';
 import 'package:medicare_admin_remaster/screen/subpages/admin_interface/presentation/bloc/admin/admin_bloc.dart';
+import 'package:medicare_admin_remaster/shared/api.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
 import 'bloc/auth/auth_bloc.dart';
 
 void main() async {
-  
-  await Supabase.initialize(
-    url: 'https://hsdwccwygehmawjdyzkr.supabase.co',
-    anonKey: 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImhzZHdjY3d5Z2VobWF3amR5emtyIiwicm9sZSI6ImFub24iLCJpYXQiOjE3MjcwNTExNTMsImV4cCI6MjA0MjYyNzE1M30.B9pE60Fnv91y2QfMWHeHYqg7ol6YhHmuftz-X5msXwk',
-  );
+  WidgetsFlutterBinding.ensureInitialized();
+  if (useSupabase) {
+    await Supabase.initialize(
+      url: supabaseUrl,
+      anonKey: supabaseKey,
+    );
+  }
   runApp(const MyApp());
 }
 

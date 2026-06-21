@@ -22,9 +22,11 @@ import 'package:medicare_admin_remaster/widget/address_dropdown.dart';
 import 'package:medicare_admin_remaster/widget/birthday_picker.dart';
 import 'dart:html' as html;
 
+import 'package:medicare_admin_remaster/widget/custom_dropdown.dart';
 import 'package:medicare_admin_remaster/widget/custom_textform_field.dart';
 import 'package:medicare_admin_remaster/widget/list_dropdown.dart';
 import 'package:medicare_admin_remaster/widget/string_dropdown.dart';
+import 'package:supabase_flutter/supabase_flutter.dart' as supabase_flutter;
 
 class UserManagementPage extends StatefulWidget {
   const UserManagementPage({super.key});
@@ -154,12 +156,19 @@ class _UserManagementPageState extends State<UserManagementPage> {
 
   bool _isFormValid = true; // State variable to track form validity
   int _addMemberStep = 0;
+  List<Map<String, dynamic>> _cardVariants = [];
+  int? _selectedCardVariantId;
+
+  // Pagination
+  int _currentPage = 1;
+  static const int _pageSize = 25;
 
   @override
   void initState() {
     super.initState();
     fetchRegions(setState);
     _loadLocalPlanTypes();
+    _fetchCardVariants();
     requests = CacheService.instance.membersStream;
     // Seed with cached data if available
     final cached = CacheService.instance.currentMembers;
@@ -182,6 +191,21 @@ class _UserManagementPageState extends State<UserManagementPage> {
       _localPlanTypeItems = localItems;
       _syncPlanTypeControllers();
     });
+  }
+
+  Future<void> _fetchCardVariants() async {
+    try {
+      final response = await supabase_flutter.Supabase.instance.client
+          .from('mp_card_variants_table')
+          .select()
+          .order('card_variant_id');
+      if (!mounted) return;
+      setState(() {
+        _cardVariants = List<Map<String, dynamic>>.from(response);
+      });
+    } catch (e) {
+      debugPrint('Error fetching card variants: $e');
+    }
   }
 
   void _syncPlanTypeControllers() {
@@ -979,7 +1003,7 @@ class _UserManagementPageState extends State<UserManagementPage> {
       'region': regionController.text,
       'user_type': int.parse(memberTypeController.text),
       'card_number': cardNumberController.text,
-      'card_type': cardTypeController.text,
+      'card_type': _selectedCardVariantId ?? cardTypeController.text,
       'enrollment_type': int.parse(enrollmentTypeController.text),
       'room_board_type': int.parse(roomAndBoardTypeController.text),
       'room_board_limit': roomAndBoardLimitController.text,
@@ -1021,6 +1045,7 @@ class _UserManagementPageState extends State<UserManagementPage> {
           benefitLimitController.text = '';
           roomAndBoardLimitController.text = '';
           _selectedSex = null;
+          _selectedCardVariantId = null;
           _birthday = null;
           isLoading = false;
           //fetchLoaRequest();
@@ -1061,6 +1086,7 @@ class _UserManagementPageState extends State<UserManagementPage> {
         benefitLimitController.text = '';
         roomAndBoardLimitController.text = '';
         _selectedSex = null;
+        _selectedCardVariantId = null;
         _birthday = null;
         isLoading = false;
         Navigator.of(context).popUntil((route) => route.isFirst);
@@ -1098,6 +1124,7 @@ class _UserManagementPageState extends State<UserManagementPage> {
   void _onSearchChanged(String value) {
     setState(() {
       searchQuery = value.toLowerCase();
+      _currentPage = 1;
     });
   }
 
@@ -1107,6 +1134,120 @@ class _UserManagementPageState extends State<UserManagementPage> {
     if (statusFilter == false) parts.add('Unverified');
     if (filterCriteria.isNotEmpty) parts.add('Search: $filterCriteria');
     return parts.join(' + ');
+  }
+
+  Widget _buildStatCard({
+    required String title,
+    required String subtitle,
+    required int count,
+    required IconData icon,
+    required Color accentColor,
+    required Color bgColor,
+  }) {
+    return Expanded(
+      child: GestureDetector(
+        onTap: () {
+          if (title == 'Verified') {
+            setState(() {
+              if (activeButtonIndex == 0) {
+                activeButtonIndex = -1;
+                statusFilter = null;
+              } else {
+                activeButtonIndex = 0;
+                filterByStatus(true);
+              }
+            });
+          } else if (title == 'Unverified') {
+            setState(() {
+              if (activeButtonIndex == 1) {
+                activeButtonIndex = -1;
+                statusFilter = null;
+              } else {
+                activeButtonIndex = 1;
+                filterByStatus(false);
+              }
+            });
+          } else {
+            setState(() {
+              if (activeButtonIndex == 2) {
+                activeButtonIndex = -1;
+                statusFilter = null;
+              } else {
+                activeButtonIndex = 2;
+                filterByStatus(null);
+              }
+            });
+          }
+        },
+        child: Container(
+          padding: const EdgeInsets.all(20),
+          decoration: BoxDecoration(
+            color: Colors.white,
+            borderRadius: BorderRadius.circular(12),
+            border: Border.all(
+              color: activeButtonIndex == (title == 'Verified' ? 0 : title == 'Unverified' ? 1 : 2)
+                  ? accentColor
+                  : const Color(0xFFE5EEFF),
+              width: activeButtonIndex == (title == 'Verified' ? 0 : title == 'Unverified' ? 1 : 2) ? 2 : 1,
+            ),
+            boxShadow: [
+              BoxShadow(
+                color: accentColor.withOpacity(0.06),
+                blurRadius: 12,
+                offset: const Offset(0, 2),
+              ),
+            ],
+          ),
+          child: Row(
+            children: [
+              Container(
+                width: 48,
+                height: 48,
+                decoration: BoxDecoration(
+                  color: bgColor,
+                  borderRadius: BorderRadius.circular(12),
+                ),
+                child: Icon(icon, color: accentColor, size: 24),
+              ),
+              const SizedBox(width: 16),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      title.toUpperCase(),
+                      style: TextStyle(
+                        fontSize: 11,
+                        fontWeight: FontWeight.w700,
+                        color: accentColor,
+                        letterSpacing: 0.8,
+                      ),
+                    ),
+                    const SizedBox(height: 4),
+                    Text(
+                      count.toString(),
+                      style: const TextStyle(
+                        fontSize: 28,
+                        fontWeight: FontWeight.w700,
+                        color: Color(0xFF0B1C30),
+                      ),
+                    ),
+                    const SizedBox(height: 2),
+                    Text(
+                      subtitle,
+                      style: TextStyle(
+                        fontSize: 11,
+                        color: const Color(0xFF40484D).withOpacity(0.7),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
   }
 
   @override
@@ -1218,7 +1359,7 @@ class _UserManagementPageState extends State<UserManagementPage> {
                               '';
                       return customerType.contains(searchQuery);
                     } else if (filterCriteria == 'contacts') {
-                      final myContact = request['contact_no'].toString();
+                      final myContact = request['contact_no']?.toString() ?? '';
                       return myContact.contains(searchQuery);
                     } else if (filterCriteria == 'company') {
                       final company =
@@ -1285,15 +1426,19 @@ class _UserManagementPageState extends State<UserManagementPage> {
 
                 countStatuses(requestsList);
                 return Padding(
-                  padding: const EdgeInsets.all(8.0),
+                  padding: const EdgeInsets.all(16.0),
                   child: Container(
                     decoration: BoxDecoration(
-                      border: Border.all(
-                        color: Colors.grey, // Outline color
-                        width: 2.0, // Outline width
-                      ),
-                      borderRadius:
-                          BorderRadius.circular(20.0), // Outline radius
+                      color: Colors.white,
+                      borderRadius: BorderRadius.circular(12),
+                      border: Border.all(color: const Color(0xFFE5EEFF), width: 1),
+                      boxShadow: [
+                        BoxShadow(
+                          color: const Color(0xFF00455D).withOpacity(0.04),
+                          blurRadius: 20,
+                          offset: const Offset(0, 4),
+                        ),
+                      ],
                     ),
                     child: Column(
                       children: [
@@ -1303,160 +1448,184 @@ class _UserManagementPageState extends State<UserManagementPage> {
                             height:
                                 20), // Add space between cards and other content
 
-                         // Row for custom text and search bar
+                         // Search and filter bar
                         Padding(
-                          padding: const EdgeInsets.only(
-                              left: 10, bottom: 15, right: 10),
+                          padding: const EdgeInsets.fromLTRB(24, 20, 24, 16),
                           child: Row(
-                            mainAxisAlignment: MainAxisAlignment.spaceBetween,
                             children: [
-                              // Active filter indicator
-                              Padding(
-                                padding: const EdgeInsets.all(8.0),
-                                child: filterCriteria.isNotEmpty || statusFilter != null
-                                    ? GestureDetector(
-                                        onTap: () {
-                                          setState(() {
-                                            filterCriteria = '';
-                                            searchQuery = '';
-                                            searchController.clear();
-                                            statusFilter = null;
-                                            activeButtonIndex = -1;
-                                          });
-                                        },
-                                        child: Container(
-                                          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-                                          decoration: BoxDecoration(
-                                            color: const Color(0xff13322b),
-                                            borderRadius: BorderRadius.circular(20),
-                                          ),
-                                          child: Row(
-                                            mainAxisSize: MainAxisSize.min,
-                                            children: [
-                                              Text(
-                                                _buildFilterLabel(),
-                                                style: const TextStyle(color: Colors.white, fontSize: 12, fontFamily: "Roboto-M"),
-                                              ),
-                                              const SizedBox(width: 6),
-                                              const Icon(Icons.close, color: Colors.white, size: 14),
-                                            ],
-                                          ),
-                                        ),
-                                      )
-                                    : const SizedBox.shrink(),
-                              ),
-                              const Spacer(),
-                              // Sort dropdown
-                              Container(
-                                height: 30,
-                                padding: const EdgeInsets.symmetric(horizontal: 8),
-                                decoration: BoxDecoration(
-                                  border: Border.all(color: Colors.black),
-                                  borderRadius: BorderRadius.circular(10),
-                                ),
-                                child: DropdownButtonHideUnderline(
-                                  child: DropdownButton<String>(
-                                    value: _sortBy.isEmpty ? null : _sortBy,
-                                    hint: const Text('Sort by', style: TextStyle(fontSize: 12, color: Colors.grey)),
-                                    isDense: true,
-                                    items: const [
-                                      DropdownMenuItem(value: 'name', child: Text('Name', style: TextStyle(fontSize: 12))),
-                                      DropdownMenuItem(value: 'id', child: Text('ID', style: TextStyle(fontSize: 12))),
-                                      DropdownMenuItem(value: 'email', child: Text('Email', style: TextStyle(fontSize: 12))),
-                                      DropdownMenuItem(value: 'status', child: Text('Status', style: TextStyle(fontSize: 12))),
-                                      DropdownMenuItem(value: 'membership', child: Text('Membership', style: TextStyle(fontSize: 12))),
-                                      DropdownMenuItem(value: 'company', child: Text('Company', style: TextStyle(fontSize: 12))),
-                                    ],
+                              // Search input
+                              Expanded(
+                                flex: 3,
+                                child: SizedBox(
+                                  height: 42,
+                                  child: TextField(
+                                    cursorColor: const Color(0xFF00455D),
+                                    controller: searchController,
+                                    style: const TextStyle(fontSize: 13, color: Color(0xFF0B1C30)),
                                     onChanged: (value) {
-                                      setState(() {
-                                        if (_sortBy == value) {
-                                          _sortDescending = !_sortDescending;
-                                        } else {
-                                          _sortBy = value ?? '';
-                                          _sortDescending = false;
-                                        }
-                                      });
+                                      _onSearchChanged(value);
+                                      // If no filterCriteria, default to 'member' search
+                                      if (filterCriteria.isEmpty && value.isNotEmpty) {
+                                        setState(() {
+                                          filterCriteria = 'member';
+                                        });
+                                      }
                                     },
+                                    decoration: InputDecoration(
+                                      hintText: 'Search members by name, ID, or email...',
+                                      hintStyle: TextStyle(fontSize: 13, color: const Color(0xFF0B1C30).withOpacity(0.4)),
+                                      prefixIcon: const Icon(Icons.search, size: 18, color: Color(0xFF70787E)),
+                                      suffixIcon: (filterCriteria.isNotEmpty || statusFilter != null || searchQuery.isNotEmpty)
+                                          ? IconButton(
+                                              icon: const Icon(Icons.close, size: 16, color: Color(0xFF70787E)),
+                                              onPressed: () {
+                                                setState(() {
+                                                  filterCriteria = '';
+                                                  searchQuery = '';
+                                                  searchController.clear();
+                                                  statusFilter = null;
+                                                  activeButtonIndex = -1;
+                                                  _currentPage = 1;
+                                                });
+                                              },
+                                            )
+                                          : null,
+                                      filled: true,
+                                      fillColor: Colors.white,
+                                      contentPadding: const EdgeInsets.symmetric(horizontal: 14),
+                                      border: OutlineInputBorder(
+                                        borderRadius: BorderRadius.circular(8),
+                                        borderSide: const BorderSide(color: Color(0xFFE5EEFF), width: 1),
+                                      ),
+                                      enabledBorder: OutlineInputBorder(
+                                        borderRadius: BorderRadius.circular(8),
+                                        borderSide: const BorderSide(color: Color(0xFFE5EEFF), width: 1),
+                                      ),
+                                      focusedBorder: OutlineInputBorder(
+                                        borderRadius: BorderRadius.circular(8),
+                                        borderSide: const BorderSide(color: Color(0xFF00455D), width: 1.5),
+                                      ),
+                                    ),
                                   ),
                                 ),
                               ),
-                              if (_sortBy.isNotEmpty) ...[
-                                const SizedBox(width: 4),
-                                GestureDetector(
-                                  onTap: () => setState(() => _sortDescending = !_sortDescending),
-                                  child: Container(
-                                    height: 30,
-                                    width: 30,
-                                    decoration: BoxDecoration(
-                                      border: Border.all(color: Colors.black),
-                                      borderRadius: BorderRadius.circular(10),
-                                    ),
-                                    child: Icon(
-                                      _sortDescending ? Icons.arrow_downward : Icons.arrow_upward,
-                                      size: 16,
-                                      color: const Color(0xff13322b),
-                                    ),
-                                  ),
-                                ),
-                              ],
-                              const SizedBox(width: 8),
-                              // Search field
+                              const SizedBox(width: 16),
+                              // Status dropdown
                               SizedBox(
-                                width: 220,
-                                height: 30,
-                                child: TextField(
-                                  cursorColor: const Color(0xff13322b),
+                                height: 42,
+                                width: 160,
+                                child: DropdownButtonFormField<bool?>(
+                                  value: statusFilter,
+                                  dropdownColor: Colors.white,
+                                  iconEnabledColor: const Color(0xFF70787E),
                                   decoration: InputDecoration(
+                                    contentPadding: const EdgeInsets.symmetric(horizontal: 12),
                                     border: OutlineInputBorder(
-                                      borderRadius: BorderRadius.circular(10),
-                                      borderSide: const BorderSide(color: Colors.black),
+                                      borderRadius: BorderRadius.circular(8),
+                                      borderSide: const BorderSide(color: Color(0xFFE5EEFF)),
+                                    ),
+                                    enabledBorder: OutlineInputBorder(
+                                      borderRadius: BorderRadius.circular(8),
+                                      borderSide: const BorderSide(color: Color(0xFFE5EEFF)),
                                     ),
                                     focusedBorder: OutlineInputBorder(
-                                      borderRadius: BorderRadius.circular(10),
-                                      borderSide: const BorderSide(color: Colors.black),
+                                      borderRadius: BorderRadius.circular(8),
+                                      borderSide: const BorderSide(color: Color(0xFF00455D)),
                                     ),
-                                    prefixIcon: const Icon(Icons.search, color: Colors.black),
-                                    hintText: filterCriteria.isEmpty
-                                        ? 'Click a column header first'
-                                        : 'Search ${filterCriteria}...',
-                                    hintStyle: const TextStyle(fontSize: 11, color: Colors.grey),
-                                    contentPadding: const EdgeInsets.symmetric(vertical: 8),
+                                    filled: true,
+                                    fillColor: Colors.white,
+                                    hintText: 'All Statuses',
+                                    hintStyle: TextStyle(fontSize: 13, color: const Color(0xFF0B1C30).withOpacity(0.4)),
                                   ),
-                                  controller: searchController,
-                                  style: const TextStyle(fontSize: 12, color: Colors.black),
+                                  items: const [
+                                    DropdownMenuItem(value: null, child: Text('All Statuses', style: TextStyle(fontSize: 13, color: Color(0xFF0B1C30)))),
+                                    DropdownMenuItem(value: true, child: Text('Verified', style: TextStyle(fontSize: 13, color: Color(0xFF0B1C30)))),
+                                    DropdownMenuItem(value: false, child: Text('Unverified', style: TextStyle(fontSize: 13, color: Color(0xFF0B1C30)))),
+                                  ],
                                   onChanged: (value) {
-                                    _onSearchChanged(value);
+                                    setState(() {
+                                      statusFilter = value;
+                                      activeButtonIndex = value == null ? -1 : (value == true ? 0 : 1);
+                                      _currentPage = 1;
+                                    });
                                   },
                                 ),
                               ),
-                              const SizedBox(width: 10),
+                              const SizedBox(width: 16),
+                              // Membership Type dropdown
+                              SizedBox(
+                                height: 42,
+                                width: 160,
+                                child: DropdownButtonFormField<String>(
+                                  value: filterCriteria == 'membership' ? searchQuery : null,
+                                  dropdownColor: Colors.white,
+                                  iconEnabledColor: const Color(0xFF70787E),
+                                  decoration: InputDecoration(
+                                    contentPadding: const EdgeInsets.symmetric(horizontal: 12),
+                                    border: OutlineInputBorder(
+                                      borderRadius: BorderRadius.circular(8),
+                                      borderSide: const BorderSide(color: Color(0xFFE5EEFF)),
+                                    ),
+                                    enabledBorder: OutlineInputBorder(
+                                      borderRadius: BorderRadius.circular(8),
+                                      borderSide: const BorderSide(color: Color(0xFFE5EEFF)),
+                                    ),
+                                    focusedBorder: OutlineInputBorder(
+                                      borderRadius: BorderRadius.circular(8),
+                                      borderSide: const BorderSide(color: Color(0xFF00455D)),
+                                    ),
+                                    filled: true,
+                                    fillColor: Colors.white,
+                                    hintText: 'All Types',
+                                    hintStyle: TextStyle(fontSize: 13, color: const Color(0xFF0B1C30).withOpacity(0.4)),
+                                  ),
+                                  items: const [
+                                    DropdownMenuItem(value: null, child: Text('All Types', style: TextStyle(fontSize: 13, color: Color(0xFF0B1C30)))),
+                                    DropdownMenuItem(value: 'principal', child: Text('Principal', style: TextStyle(fontSize: 13, color: Color(0xFF0B1C30)))),
+                                    DropdownMenuItem(value: 'dependent', child: Text('Dependent', style: TextStyle(fontSize: 13, color: Color(0xFF0B1C30)))),
+                                  ],
+                                  onChanged: (value) {
+                                    setState(() {
+                                      if (value != null) {
+                                        filterCriteria = 'membership';
+                                        searchQuery = value;
+                                      } else {
+                                        filterCriteria = '';
+                                        searchQuery = '';
+                                      }
+                                      _currentPage = 1;
+                                    });
+                                  },
+                                ),
+                              ),
+                              const SizedBox(width: 16),
+                              // Add Member button
                               BlocBuilder<AuthBloc, AuthState>(
-                                  builder: (context, state) {
-                                if (state is AuthSuccess) {
-                                  if (state.adminType == 'admin' ||
-                                      state.adminType == 'upd') {
-                                    return ElevatedButton(
-                                      onPressed: () {
-                                        setState(() {
-                                          fetchRegions(setState);
-                                        });
-                                        _showDialog(context, setState);
-                                      },
-                                      style: ElevatedButton.styleFrom(
-                                        shape: RoundedRectangleBorder(
-                                          borderRadius: BorderRadius.circular(20),
+                                builder: (context, state) {
+                                  if (state is AuthSuccess) {
+                                    if (state.adminType == 'admin' || state.adminType == 'upd') {
+                                      return SizedBox(
+                                        height: 42,
+                                        child: ElevatedButton.icon(
+                                          onPressed: () {
+                                            setState(() { fetchRegions(setState); });
+                                            _showDialog(context, setState);
+                                          },
+                                          icon: const Icon(Icons.person_add, size: 18),
+                                          label: const Text('Add Member', style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600)),
+                                          style: ElevatedButton.styleFrom(
+                                            backgroundColor: const Color(0xFF00455D),
+                                            foregroundColor: Colors.white,
+                                            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                                            padding: const EdgeInsets.symmetric(horizontal: 16),
+                                          ),
                                         ),
-                                        backgroundColor: const Color(0xff13322b),
-                                      ),
-                                      child: const Text(
-                                        "Add Member",
-                                        style: TextStyle(color: Colors.white),
-                                      ),
-                                    );
+                                      );
+                                    }
                                   }
-                                }
-                                return Container();
-                              }),
+                                  return const SizedBox.shrink();
+                                },
+                              ),
                             ],
                           ),
                         ),
@@ -1513,242 +1682,45 @@ class _UserManagementPageState extends State<UserManagementPage> {
                         //   ),
                         // ),
 
+                        // Stats cards
                         Padding(
-                          padding: const EdgeInsets.only(left: 20, right: 20),
+                          padding: const EdgeInsets.fromLTRB(24, 0, 24, 16),
                           child: Row(
-                            mainAxisAlignment: MainAxisAlignment.spaceBetween,
                             children: [
-                              Expanded(
-                                child: GestureDetector(
-                                  onTap: () {
-                                    setState(() {
-                                      if (activeButtonIndex == 0) {
-                                        // If the button is already active, show all requests
-                                        activeButtonIndex =
-                                            -1; // Reset to inactive state
-                                        statusFilter = null;
-                                        filteredRequests = statusFilter == true
-                                            ? requestsList
-                                                .where((request) =>
-                                                    request['is_verified'] ==
-                                                    true)
-                                                .toList()
-                                            : statusFilter == false
-                                                ? requestsList
-                                                    .where((request) =>
-                                                        request[
-                                                            'is_verified'] ==
-                                                        false)
-                                                    .toList()
-                                                : requestsList;
-                                      } else {
-                                        // Set active button index to the first button and filter by approved status
-                                        activeButtonIndex = 0;
-                                        filterByStatus(true);
-                                      }
-                                    });
-                                  },
-                                  child: Container(
-                                    height: 120,
-                                    decoration: BoxDecoration(
-                                      color: const Color(
-                                          0xff66cce9), // Set background color
-                                      border: Border.all(
-                                        color: activeButtonIndex == 0
-                                            ? Colors.black
-                                            : Colors.grey,
-                                        width: 2,
-                                      ), // Outline based on active state
-                                      borderRadius: BorderRadius.circular(5),
-                                    ),
-                                    child: Center(
-                                      child: Column(
-                                        mainAxisAlignment: MainAxisAlignment
-                                            .center, // Center content vertically
-                                        children: [
-                                          Text(
-                                            '$activeCount', // Show loading count
-                                            style: const TextStyle(
-                                              //fontWeight: FontWeight.bold,
-                                              fontSize:
-                                                  30, // Set font size for count
-                                              color: Colors
-                                                  .black, // Set count text color to white
-                                            ),
-                                          ),
-                                          const SizedBox(
-                                              height:
-                                                  4), // Add space between count and text
-                                          const Text(
-                                            'VERIFIED',
-                                            style: TextStyle(
-                                              fontSize:
-                                                  12, // Set font size to 12
-                                              fontWeight: FontWeight
-                                                  .bold, // Make text bold
-                                              color: Colors
-                                                  .black, // Set text color to white
-                                            ),
-                                          ),
-                                        ],
-                                      ),
-                                    ),
-                                  ),
-                                ),
+                              _buildStatCard(
+                                title: 'Verified',
+                                subtitle: 'Verified Member Accounts',
+                                count: activeCount,
+                                icon: Icons.check_circle_outline,
+                                accentColor: const Color(0xFF006B5F),
+                                bgColor: const Color(0xFFE8F5F0),
                               ),
-
-                              const SizedBox(width: 8.0), // Space between cards
-                              Expanded(
-                                child: GestureDetector(
-                                  onTap: () {
-                                    setState(() {
-                                      if (activeButtonIndex == 1) {
-                                        // If the button is already active, show all requests
-                                        activeButtonIndex =
-                                            -1; // Reset to inactive state
-                                        statusFilter = null;
-                                        filteredRequests = statusFilter == true
-                                            ? requestsList
-                                                .where((request) =>
-                                                    request['is_verified'] ==
-                                                    true)
-                                                .toList()
-                                            : statusFilter == false
-                                                ? requestsList
-                                                    .where((request) =>
-                                                        request[
-                                                            'is_verified'] ==
-                                                        false)
-                                                    .toList()
-                                                : requestsList;
-                                      } else {
-                                        // Set active button index to the second button and filter by pending status
-                                        activeButtonIndex = 1;
-                                        filterByStatus(false);
-                                      }
-                                    });
-                                  },
-                                  child: Container(
-                                    height: 120,
-                                    decoration: BoxDecoration(
-                                      color: const Color(
-                                          0xfffec316), // Set background color
-                                      border: Border.all(
-                                        color: activeButtonIndex == 1
-                                            ? Colors.black
-                                            : Colors.grey,
-                                        width: 2,
-                                      ), // Outline based on active state
-                                      borderRadius: BorderRadius.circular(5),
-                                    ),
-                                    child: Center(
-                                      child: Column(
-                                        mainAxisAlignment: MainAxisAlignment
-                                            .center, // Center content vertically
-                                        children: [
-                                          Text(
-                                            '$inactiveCount', // Show loading count
-                                            style: const TextStyle(
-                                              //fontWeight: FontWeight.bold,
-                                              fontSize:
-                                                  30, // Set font size for count
-                                              color: Colors
-                                                  .black, // Set count text color to white
-                                            ),
-                                          ),
-                                          const SizedBox(
-                                              height:
-                                                  4), // Add space between count and text
-                                          const Text(
-                                            'UNVERIFIED',
-                                            style: TextStyle(
-                                              fontSize:
-                                                  12, // Set font size to 12
-                                              fontWeight: FontWeight
-                                                  .bold, // Make text bold
-                                              color: Colors
-                                                  .black, // Set text color to white
-                                            ),
-                                          ),
-                                        ],
-                                      ),
-                                    ),
-                                  ),
-                                ),
+                              const SizedBox(width: 16),
+                              _buildStatCard(
+                                title: 'Unverified',
+                                subtitle: 'Accounts Awaiting Verification',
+                                count: inactiveCount,
+                                icon: Icons.pending_outlined,
+                                accentColor: const Color(0xFFBA1A1A),
+                                bgColor: const Color(0xFFFFF0EE),
                               ),
-
-                              const SizedBox(width: 8.0), // Space between cards
-                              Expanded(
-                                child: GestureDetector(
-                                  onTap: () {
-                                    setState(() {
-                                      filteredRequests = requestsList;
-                                      if (activeButtonIndex == 2) {
-                                        // If the button is already active, show all requests
-                                        activeButtonIndex =
-                                            -1; // Reset to inactive state
-                                        // Call function to show all requests
-                                        statusFilter = null;
-                                        filteredRequests = requestsList;
-                                      } else {
-                                        // Set active button index to the third button and filter by rejected status
-                                        activeButtonIndex = 2;
-                                        filterByStatus(null);
-                                      }
-                                    });
-                                  },
-                                  child: Container(
-                                    height: 120,
-                                    decoration: BoxDecoration(
-                                      color: const Color(
-                                          0xfff0516e), // Set background color
-                                      border: Border.all(
-                                        color: activeButtonIndex == 2
-                                            ? Colors.black
-                                            : Colors.grey,
-                                        width: 2,
-                                      ), // Outline based on active state
-                                      borderRadius: BorderRadius.circular(5),
-                                    ),
-                                    child: Center(
-                                      child: Column(
-                                        mainAxisAlignment: MainAxisAlignment
-                                            .center, // Center content vertically
-                                        children: [
-                                          Text(
-                                            '$bothCount', // Show loading count
-                                            style: const TextStyle(
-                                              //fontWeight: FontWeight.bold,
-                                              fontSize:
-                                                  30, // Set font size for count
-                                              color: Colors
-                                                  .black, // Set count text color to white
-                                            ),
-                                          ),
-                                          const SizedBox(
-                                              height:
-                                                  4), // Add space between count and text
-                                          const Text(
-                                            'TOTAL',
-                                            style: TextStyle(
-                                              fontSize:
-                                                  12, // Set font size to 12
-                                              fontWeight: FontWeight
-                                                  .bold, // Make text bold
-                                              color: Colors
-                                                  .black, // Set text color to white
-                                            ),
-                                          ),
-                                        ],
-                                      ),
-                                    ),
-                                  ),
-                                ),
+                              const SizedBox(width: 16),
+                              _buildStatCard(
+                                title: 'Total',
+                                subtitle: 'Aggregate Platform Users',
+                                count: bothCount,
+                                icon: Icons.people_outline,
+                                accentColor: const Color(0xFF00455D),
+                                bgColor: const Color(0xFFEFF4FF),
                               ),
                             ],
                           ),
                         ),
-                        const SizedBox(height: 10),
+                        const Padding(
+                          padding: EdgeInsets.symmetric(horizontal: 24),
+                          child: Divider(height: 1, color: Color(0xFFE5EEFF)),
+                        ),
+                        const SizedBox(height: 16),
                         // Table headers
                         Padding(
                           padding: const EdgeInsets.only(left: 20, right: 20),
@@ -2125,11 +2097,86 @@ class _UserManagementPageState extends State<UserManagementPage> {
                           ),
                         ),
                         const SizedBox(height: 8.0),
+                        // Pagination info
+                        Padding(
+                          padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 8),
+                          child: Row(
+                            children: [
+                              Text(
+                                'Showing ${(_currentPage - 1) * _pageSize + 1} to ${_currentPage * _pageSize > filteredRequests.length ? filteredRequests.length : _currentPage * _pageSize} of ${filteredRequests.length} entries',
+                                style: const TextStyle(fontSize: 12, color: Color(0xFF40484D)),
+                              ),
+                              const Spacer(),
+                              // Page navigation
+                              if (filteredRequests.length > _pageSize) ...[
+                                IconButton(
+                                  onPressed: _currentPage > 1
+                                      ? () => setState(() => _currentPage--)
+                                      : null,
+                                  icon: const Icon(Icons.chevron_left, size: 18),
+                                  color: _currentPage > 1 ? const Color(0xFF00455D) : Colors.grey,
+                                  padding: EdgeInsets.zero,
+                                  constraints: const BoxConstraints(),
+                                ),
+                                const SizedBox(width: 4),
+                                ...List.generate(
+                                  (filteredRequests.length / _pageSize).ceil(),
+                                  (i) => i + 1,
+                                ).take(5).map((page) => GestureDetector(
+                                  onTap: () => setState(() => _currentPage = page),
+                                  child: Container(
+                                    width: 28,
+                                    height: 28,
+                                    margin: const EdgeInsets.symmetric(horizontal: 2),
+                                    decoration: BoxDecoration(
+                                      color: _currentPage == page ? const Color(0xFF00455D) : Colors.transparent,
+                                      borderRadius: BorderRadius.circular(6),
+                                    ),
+                                    child: Center(
+                                      child: Text(
+                                        '$page',
+                                        style: TextStyle(
+                                          fontSize: 12,
+                                          fontWeight: FontWeight.w600,
+                                          color: _currentPage == page ? Colors.white : const Color(0xFF00455D),
+                                        ),
+                                      ),
+                                    ),
+                                  ),
+                                )),
+                                if ((filteredRequests.length / _pageSize).ceil() > 5)
+                                  const Padding(
+                                    padding: EdgeInsets.symmetric(horizontal: 4),
+                                    child: Text('...', style: TextStyle(fontSize: 12, color: Color(0xFF70787E))),
+                                  ),
+                                IconButton(
+                                  onPressed: _currentPage < (filteredRequests.length / _pageSize).ceil()
+                                      ? () => setState(() => _currentPage++)
+                                      : null,
+                                  icon: const Icon(Icons.chevron_right, size: 18),
+                                  color: _currentPage < (filteredRequests.length / _pageSize).ceil()
+                                      ? const Color(0xFF00455D)
+                                      : Colors.grey,
+                                  padding: EdgeInsets.zero,
+                                  constraints: const BoxConstraints(),
+                                ),
+                              ],
+                            ],
+                          ),
+                        ),
+                        const Divider(height: 1, color: Color(0xFFE5EEFF)),
                         Expanded(
                           child: ListView.builder(
-                            itemCount: filteredRequests.length,
+                            itemCount: (() {
+                              final totalPages = (filteredRequests.length / _pageSize).ceil();
+                              final start = (_currentPage - 1) * _pageSize;
+                              final end = start + _pageSize;
+                              return filteredRequests.length > start
+                                  ? (end > filteredRequests.length ? filteredRequests.length - start : _pageSize)
+                                  : 0;
+                            })(),
                             itemBuilder: (context, index) {
-                              final request = filteredRequests[index];
+                              final request = filteredRequests[(_currentPage - 1) * _pageSize + index];
                               final customerType =
                                   request['mp_customer_type_table']
                                           ?['customer_type'] ??
@@ -2538,20 +2585,46 @@ class _UserManagementPageState extends State<UserManagementPage> {
                                                                       'is_active': !request['is_active'],
                                                                     }),
                                                                   );
-                                                                  if (response.statusCode == 200 && mounted) {
-                                                                    ScaffoldMessenger.of(context).showSnackBar(
-                                                                      SnackBar(
-                                                                        backgroundColor: const Color(0xff13322b),
-                                                                        content: Text(
-                                                                          request['is_active']
-                                                                              ? '${request['first_name']} deactivated'
-                                                                              : '${request['first_name']} activated',
+                                                                  if (response.statusCode == 200) {
+                                                                    final wasActive = request['is_active'] == true;
+                                                                    request['is_active'] = !wasActive;
+                                                                    if (mounted) {
+                                                                      setState(() {});
+                                                                      ScaffoldMessenger.of(context).showSnackBar(
+                                                                        SnackBar(
+                                                                          backgroundColor:
+                                                                              const Color(0xff13322b),
+                                                                          content: Text(
+                                                                            wasActive
+                                                                                ? '${request['first_name']} deactivated'
+                                                                                : '${request['first_name']} activated',
+                                                                          ),
                                                                         ),
+                                                                      );
+                                                                    }
+                                                                  } else {
+                                                                    if (mounted) {
+                                                                      ScaffoldMessenger.of(context)
+                                                                          .showSnackBar(
+                                                                        SnackBar(
+                                                                          backgroundColor: Colors.red,
+                                                                          content: Text(
+                                                                              'Failed to update status (${response.statusCode})'),
+                                                                        ),
+                                                                      );
+                                                                    }
+                                                                  }
+                                                                } catch (e) {
+                                                                  if (mounted) {
+                                                                    ScaffoldMessenger.of(context)
+                                                                        .showSnackBar(
+                                                                      SnackBar(
+                                                                        backgroundColor: Colors.red,
+                                                                        content: Text(
+                                                                            'Error toggling active: $e'),
                                                                       ),
                                                                     );
                                                                   }
-                                                                } catch (e) {
-                                                                  print('Error toggling active: $e');
                                                                 }
                                                               }
                                                             },
@@ -4214,9 +4287,26 @@ class _UserManagementPageState extends State<UserManagementPage> {
   }
 
   void showDetails(BuildContext context, final request) {
+    if (request == null || request.isEmpty) {
+      _showMessage(
+          'Unable to load member details. Please try again.', 'No Data Found');
+      return;
+    }
+    final firstMember = request[0];
+    if (firstMember == null) {
+      _showMessage(
+          'Unable to load member details. Please try again.', 'No Data Found');
+      return;
+    }
     final customerType =
-        request[0]['mp_customer_type_table']?['customer_type'] ?? 'N/A';
-    var cardTable = request[0]['mp_card_table'][0];
+        firstMember['mp_customer_type_table']?['customer_type'] ?? 'N/A';
+    final cardList = firstMember['mp_card_table'];
+    if (cardList == null || (cardList is List && cardList.isEmpty)) {
+      _showMessage(
+          'This member has no card record on file.', 'No Card Found');
+      return;
+    }
+    var cardTable = cardList[0];
     var selectedCard = cardTable;
     showDialog(
       context: context,
@@ -4270,7 +4360,9 @@ class _UserManagementPageState extends State<UserManagementPage> {
                               TableRow(children: [
                                 const Text("First Name",
                                     style: TextStyle(color: Colors.black)),
-                                Text(request[0]['first_name'],
+                                Text(
+                                    request[0]['first_name']?.toString() ??
+                                        'N/A',
                                     style:
                                         const TextStyle(color: Colors.black)),
                               ]),
@@ -4284,14 +4376,18 @@ class _UserManagementPageState extends State<UserManagementPage> {
                               TableRow(children: [
                                 const Text("Last Name",
                                     style: TextStyle(color: Colors.black)),
-                                Text(request[0]['last_name'],
+                                Text(
+                                    request[0]['last_name']?.toString() ??
+                                        'N/A',
                                     style:
                                         const TextStyle(color: Colors.black)),
                               ]),
                               TableRow(children: [
                                 const Text("Contact Number",
                                     style: TextStyle(color: Colors.black)),
-                                Text(request[0]['contact_no'],
+                                Text(
+                                    request[0]['contact_no']?.toString() ??
+                                        'N/A',
                                     style:
                                         const TextStyle(color: Colors.black)),
                               ]),
@@ -4312,7 +4408,9 @@ class _UserManagementPageState extends State<UserManagementPage> {
                               TableRow(children: [
                                 const Text("Birthdate",
                                     style: TextStyle(color: Colors.black)),
-                                Text(request[0]['birth_date'],
+                                Text(
+                                    request[0]['birth_date']?.toString() ??
+                                        'N/A',
                                     style:
                                         const TextStyle(color: Colors.black)),
                               ]),
@@ -4589,6 +4687,1249 @@ class _UserManagementPageState extends State<UserManagementPage> {
     );
   }
 
+  Widget _buildPillStepperHeader(StateSetter dialogSetState) {
+    final stepLabels = ['Member Info', 'Plan & Card', 'Confirm'];
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(4, 4, 4, 12),
+      child: Row(
+        children: List.generate(stepLabels.length, (i) {
+          final isActive = i == _addMemberStep;
+          final isCompleted = i < _addMemberStep;
+          final isClickable = i < _addMemberStep;
+          return Expanded(
+            child: Row(
+              children: [
+                Expanded(
+                  child: InkWell(
+                    onTap: isClickable
+                        ? () => dialogSetState(() => _addMemberStep = i)
+                        : null,
+                    borderRadius: BorderRadius.circular(24),
+                    child: Container(
+                      padding: const EdgeInsets.symmetric(
+                          horizontal: 10, vertical: 8),
+                      decoration: BoxDecoration(
+                        color: isActive
+                            ? const Color(0xff13322b)
+                            : (isCompleted
+                                ? const Color(0xffE8F0ED)
+                                : const Color(0xffF1F1F1)),
+                        borderRadius: BorderRadius.circular(24),
+                      ),
+                      child: Row(
+                        mainAxisSize: MainAxisSize.min,
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        children: [
+                          Container(
+                            width: 22,
+                            height: 22,
+                            decoration: BoxDecoration(
+                              color: isActive
+                                  ? Colors.white
+                                  : const Color(0xff13322b),
+                              shape: BoxShape.circle,
+                            ),
+                            child: Center(
+                              child: isCompleted
+                                  ? const Icon(Icons.check,
+                                      size: 14, color: Color(0xff13322b))
+                                  : Text(
+                                      '${i + 1}',
+                                      style: TextStyle(
+                                        color: isActive
+                                            ? const Color(0xff13322b)
+                                            : Colors.white,
+                                        fontSize: 12,
+                                        fontWeight: FontWeight.bold,
+                                      ),
+                                    ),
+                            ),
+                          ),
+                          const SizedBox(width: 6),
+                          Flexible(
+                            child: Text(
+                              stepLabels[i],
+                              style: TextStyle(
+                                color: isActive
+                                    ? Colors.white
+                                    : (isCompleted
+                                        ? const Color(0xff13322b)
+                                        : const Color(0xff757575)),
+                                fontWeight: FontWeight.w600,
+                                fontSize: 12,
+                              ),
+                              overflow: TextOverflow.ellipsis,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
+                ),
+                if (i < stepLabels.length - 1)
+                  Container(
+                    width: 6,
+                    height: 1.5,
+                    margin: const EdgeInsets.symmetric(horizontal: 1),
+                    color: isCompleted
+                        ? const Color(0xff13322b)
+                        : const Color(0xffE0E0E0),
+                  ),
+              ],
+            ),
+          );
+        }),
+      ),
+    );
+  }
+
+  Widget _buildDialogHeader(BuildContext ctx, StateSetter setState) {
+    return Container(
+      padding: const EdgeInsets.fromLTRB(24, 18, 16, 18),
+      decoration: const BoxDecoration(
+        border: Border(
+          bottom: BorderSide(color: Color(0xffE8ECEF), width: 1),
+        ),
+      ),
+      child: Row(
+        children: [
+          const Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text('Add Member',
+                    style: TextStyle(
+                        fontSize: 20,
+                        fontWeight: FontWeight.bold,
+                        color: Color(0xff13322b))),
+                SizedBox(height: 2),
+                Text('Fill in the details to register a new member.',
+                    style: TextStyle(fontSize: 12, color: Color(0xff7A8A86))),
+              ],
+            ),
+          ),
+          OutlinedButton.icon(
+            onPressed: () => _pickFiles(setState),
+            icon: const Icon(Icons.upload_file,
+                size: 18, color: Color(0xff13322b)),
+            label: const Text('Bulk Upload',
+                style: TextStyle(
+                    color: Color(0xff13322b), fontWeight: FontWeight.w600)),
+            style: OutlinedButton.styleFrom(
+              side: const BorderSide(color: Color(0xff13322b), width: 1.2),
+              shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(8)),
+              padding:
+                  const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+            ),
+          ),
+          const SizedBox(width: 6),
+          IconButton(
+            onPressed: () => Navigator.pop(ctx),
+            icon: const Icon(Icons.close, color: Color(0xff13322b)),
+            tooltip: 'Close',
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildSectionHeader(String title) {
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 12),
+      child: Row(
+        children: [
+          Container(
+            width: 4,
+            height: 16,
+            decoration: BoxDecoration(
+              color: const Color(0xff13322b),
+              borderRadius: BorderRadius.circular(2),
+            ),
+          ),
+          const SizedBox(width: 8),
+          Text(
+            title,
+            style: const TextStyle(
+                fontSize: 14,
+                fontWeight: FontWeight.w700,
+                color: Color(0xff13322b),
+                letterSpacing: 0.2),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildStepContent(BuildContext ctx, StateSetter setState) {
+    switch (_addMemberStep) {
+      case 0:
+        return _buildStep1MemberInfo(ctx, setState);
+      case 1:
+        return _buildStep2PlanCard(ctx, setState);
+      case 2:
+        return _buildStep3Confirm(ctx, setState);
+      default:
+        return const SizedBox.shrink();
+    }
+  }
+
+  Widget _buildStep1MemberInfo(BuildContext ctx, StateSetter setState) {
+    return Form(
+      key: _formKey,
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          _buildSectionHeader('Personal Details'),
+          Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Expanded(
+                child: CustomTextFormField(
+                  label: const Row(children: [
+                    Text('First Name', style: TextStyle(color: Colors.black)),
+                    Text(' *', style: TextStyle(color: Colors.red)),
+                  ]),
+                  labelStyle: const TextStyle(
+                      color: Color(0xff13322b), fontSize: 13),
+                  controller: fnameController,
+                  isNumeric: false,
+                  validator: (value) {
+                    if (value == null || value.isEmpty) {
+                      return 'First name is required';
+                    }
+                    return null;
+                  },
+                ),
+              ),
+              const SizedBox(width: 12),
+              Expanded(
+                child: CustomTextFormField(
+                  label: const Row(children: [
+                    Text('Middle Name', style: TextStyle(color: Colors.black)),
+                  ]),
+                  labelStyle: const TextStyle(
+                      color: Color(0xff13322b), fontSize: 13),
+                  controller: mnameController,
+                  isNumeric: false,
+                  validator: (value) => null,
+                ),
+              ),
+              const SizedBox(width: 12),
+              Expanded(
+                child: CustomTextFormField(
+                  label: const Row(children: [
+                    Text('Last Name', style: TextStyle(color: Colors.black)),
+                    Text(' *', style: TextStyle(color: Colors.red)),
+                  ]),
+                  labelStyle: const TextStyle(
+                      color: Color(0xff13322b), fontSize: 13),
+                  controller: lnameController,
+                  isNumeric: false,
+                  validator: (value) {
+                    if (value == null || value.isEmpty) {
+                      return 'Last name is required';
+                    }
+                    return null;
+                  },
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 14),
+          Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Expanded(
+                child: CustomTextFormField(
+                  label: const Row(children: [
+                    Text('Contact No', style: TextStyle(color: Colors.black)),
+                    Text(' *', style: TextStyle(color: Colors.red)),
+                  ]),
+                  labelStyle: const TextStyle(
+                      color: Color(0xff13322b), fontSize: 13),
+                  controller: contactNoController,
+                  isNumeric: true,
+                  maxLength: 11,
+                  validator: (value) {
+                    if (value == null || value.isEmpty) {
+                      return 'Contact number is required';
+                    }
+                    final regExp = RegExp(r'^\d+$');
+                    if (!regExp.hasMatch(value)) {
+                      return 'Please enter a valid number';
+                    }
+                    return null;
+                  },
+                ),
+              ),
+              const SizedBox(width: 12),
+              Expanded(
+                child: CustomTextFormField(
+                  label: const Row(children: [
+                    Text('Email Address',
+                        style: TextStyle(color: Colors.black)),
+                    Text(' *', style: TextStyle(color: Colors.red)),
+                  ]),
+                  labelStyle: const TextStyle(
+                      color: Color(0xff13322b), fontSize: 13),
+                  controller: emailController,
+                  isNumeric: false,
+                  isEmail: true,
+                  validator: (value) {
+                    if (value == null || value.isEmpty) {
+                      return 'Email address is required';
+                    }
+                    final regExp = RegExp(
+                        r'^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$');
+                    if (!regExp.hasMatch(value)) {
+                      return 'Please input a valid email';
+                    }
+                    return null;
+                  },
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 14),
+          Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Expanded(child: _buildSexField(setState)),
+              const SizedBox(width: 12),
+              Expanded(child: _buildBirthdayField(ctx, setState)),
+              const SizedBox(width: 12),
+              Expanded(
+                child: CustomStringDropdownFormField(
+                  label: 'Civil Status',
+                  labelStyle: const TextStyle(
+                      color: Color(0xff13322b), fontSize: 13),
+                  items: civilStatusTypeItems,
+                  controller: civilStatusController,
+                  onChanged: (selectedItem) {},
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 28),
+          _buildSectionHeader('Address'),
+          CustomTextFormField(
+            label: const Row(children: [
+              Text('House Address', style: TextStyle(color: Colors.black)),
+            ]),
+            labelStyle: const TextStyle(
+                color: Color(0xff13322b), fontSize: 13),
+            controller: houseAddressController,
+            isNumeric: false,
+            validator: (value) => null,
+          ),
+          const SizedBox(height: 14),
+          Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Expanded(child: _buildRegionDropdown(setState)),
+              const SizedBox(width: 12),
+              Expanded(child: _buildProvinceDropdown(setState)),
+            ],
+          ),
+          const SizedBox(height: 14),
+          Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Expanded(child: _buildCityDropdown(setState)),
+              const SizedBox(width: 12),
+              Expanded(child: _buildBarangayDropdown(setState)),
+              const SizedBox(width: 12),
+              Expanded(
+                child: CustomTextFormField(
+                  label: const Row(children: [
+                    Text('Postal Code', style: TextStyle(color: Colors.black)),
+                  ]),
+                  labelStyle: const TextStyle(
+                      color: Color(0xff13322b), fontSize: 13),
+                  controller: postalCodeController,
+                  isNumeric: true,
+                  maxLength: 4,
+                  validator: (value) => null,
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 8),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildSexField(StateSetter setState) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        const Text('Sex *',
+            style: TextStyle(
+                fontSize: 13,
+                color: Color(0xff13322b),
+                fontWeight: FontWeight.w500)),
+        const SizedBox(height: 6),
+        Container(
+          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+          decoration: BoxDecoration(
+            border: Border.all(
+              color: noSex
+                  ? Colors.red.withOpacity(0.5)
+                  : const Color(0xff13322b).withOpacity(0.35),
+              width: 1.5,
+            ),
+            borderRadius: BorderRadius.circular(5),
+          ),
+          child: Row(
+            children: [
+              Expanded(
+                child: Row(
+                  children: [
+                    Radio<String>(
+                      value: 'Male',
+                      groupValue: _selectedSex,
+                      onChanged: (v) => setState(() => _selectedSex = v),
+                      activeColor: const Color(0xff13322b),
+                      visualDensity: VisualDensity.compact,
+                      materialTapTargetSize:
+                          MaterialTapTargetSize.shrinkWrap,
+                    ),
+                    const Text('Male',
+                        style: TextStyle(
+                            fontSize: 13, color: Color(0xff13322b))),
+                  ],
+                ),
+              ),
+              Expanded(
+                child: Row(
+                  children: [
+                    Radio<String>(
+                      value: 'Female',
+                      groupValue: _selectedSex,
+                      onChanged: (v) => setState(() => _selectedSex = v),
+                      activeColor: const Color(0xff13322b),
+                      visualDensity: VisualDensity.compact,
+                      materialTapTargetSize:
+                          MaterialTapTargetSize.shrinkWrap,
+                    ),
+                    const Text('Female',
+                        style: TextStyle(
+                            fontSize: 13, color: Color(0xff13322b))),
+                  ],
+                ),
+              ),
+            ],
+          ),
+        ),
+        if (noSex)
+          const Padding(
+            padding: EdgeInsets.only(left: 4, top: 4),
+            child: Text('Please select a sex',
+                style: TextStyle(fontSize: 11, color: Colors.red)),
+          ),
+      ],
+    );
+  }
+
+  Widget _buildBirthdayField(BuildContext ctx, StateSetter setState) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        const Text('Birthday *',
+            style: TextStyle(
+                fontSize: 13,
+                color: Color(0xff13322b),
+                fontWeight: FontWeight.w500)),
+        const SizedBox(height: 6),
+        InkWell(
+          onTap: () {
+            setState(() => isDateError = false);
+            _selectDate(ctx, setState, _birthday.toString());
+          },
+          child: Container(
+            height: 48,
+            padding: const EdgeInsets.symmetric(horizontal: 12),
+            alignment: Alignment.centerLeft,
+            decoration: BoxDecoration(
+              border: Border.all(
+                color: isDateError
+                    ? Colors.red.withOpacity(0.5)
+                    : const Color(0xff13322b).withOpacity(0.35),
+                width: 1.5,
+              ),
+              borderRadius: BorderRadius.circular(5),
+            ),
+            child: Row(
+              children: [
+                const Icon(Icons.calendar_today,
+                    size: 14, color: Color(0xff13322b)),
+                const SizedBox(width: 8),
+                Expanded(
+                  child: Text(
+                    _birthday != null
+                        ? "${_birthday?.toLocal()}".split(' ')[0]
+                        : dateLabel,
+                    style: TextStyle(
+                      fontSize: 13,
+                      color: isDateError
+                          ? Colors.red.withOpacity(0.7)
+                          : const Color(0xff13322b),
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ),
+        if (isDateError)
+          Padding(
+            padding: const EdgeInsets.only(left: 4, top: 4),
+            child: Text(dateLabel,
+                style: const TextStyle(fontSize: 11, color: Colors.red)),
+          ),
+      ],
+    );
+  }
+
+  Widget _buildRegionDropdown(StateSetter setState) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        const Text('Region',
+            style: TextStyle(
+                fontSize: 13,
+                color: Color(0xff13322b),
+                fontWeight: FontWeight.w500)),
+        const SizedBox(height: 6),
+        SizedBox(
+          height: 48,
+          child: CustomDropdown<Region>(
+            items: regions,
+            itemAsString: (r) => r.regionName,
+            hintText: 'Select Region',
+            selectedItem: regions.firstWhere(
+              (r) => r.code == selectedRegion,
+              orElse: () => Region(code: '', regionName: 'Select Region'),
+            ),
+            onChanged: (Region? newValue) {
+              setState(() {
+                selectedRegion = newValue?.code;
+                eregionController.text = newValue!.regionName;
+                fetchProvinces(selectedRegion!, setState);
+                provinces.clear();
+                cities.clear();
+                barangays.clear();
+              });
+            },
+          ),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildProvinceDropdown(StateSetter setState) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        const Text('Province',
+            style: TextStyle(
+                fontSize: 13,
+                color: Color(0xff13322b),
+                fontWeight: FontWeight.w500)),
+        const SizedBox(height: 6),
+        SizedBox(
+          height: 48,
+          child: CustomDropdown<Province>(
+            items: provinces,
+            itemAsString: (p) => p.name,
+            hintText: 'Select Province',
+            selectedItem: provinces.firstWhere(
+              (p) => p.code == selectedProvince,
+              orElse: () => Province(code: '', name: 'Select Province'),
+            ),
+            onChanged: (Province? newValue) {
+              setState(() {
+                selectedProvince = newValue?.code;
+                provinceController.text = newValue!.name;
+                fetchCities(selectedProvince!, setState);
+                cities.clear();
+                barangays.clear();
+              });
+            },
+          ),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildCityDropdown(StateSetter setState) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        const Text('City',
+            style: TextStyle(
+                fontSize: 13,
+                color: Color(0xff13322b),
+                fontWeight: FontWeight.w500)),
+        const SizedBox(height: 6),
+        SizedBox(
+          height: 48,
+          child: CustomDropdown<City>(
+            items: cities,
+            itemAsString: (c) => c.name,
+            hintText: 'Select City',
+            selectedItem: cities.firstWhere(
+              (c) => c.code == selectedCity,
+              orElse: () => City(code: '', name: 'Select City'),
+            ),
+            onChanged: (City? newValue) {
+              setState(() {
+                selectedCity = newValue?.code;
+                cityController.text = newValue!.name;
+                fetchBarangays(selectedCity!, setState);
+                barangays.clear();
+              });
+            },
+          ),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildBarangayDropdown(StateSetter setState) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        const Text('Barangay',
+            style: TextStyle(
+                fontSize: 13,
+                color: Color(0xff13322b),
+                fontWeight: FontWeight.w500)),
+        const SizedBox(height: 6),
+        SizedBox(
+          height: 48,
+          child: CustomDropdown<Barangay>(
+            items: barangays,
+            itemAsString: (b) => b.name,
+            hintText: 'Select Barangay',
+            selectedItem: barangays.firstWhere(
+              (b) => b.code == selectedBarangay,
+              orElse: () =>
+                  Barangay(code: '', name: 'Select Barangay', postal: ''),
+            ),
+            onChanged: (Barangay? newValue) {
+              setState(() {
+                selectedBarangay = newValue?.code;
+                barangayController.text = newValue!.name;
+                postalCodeController.text = newValue.postal;
+              });
+            },
+          ),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildStep2PlanCard(BuildContext ctx, StateSetter setState) {
+    return Form(
+      key: _formKey2,
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          _buildSectionHeader('Plan Details'),
+          Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Expanded(
+                child: _buildStatusDropdown(
+                  label: 'Member Type',
+                  items: memberTypeItems,
+                  controller: memberTypeController,
+                  setState: setState,
+                ),
+              ),
+              const SizedBox(width: 12),
+              Expanded(
+                child: _buildStatusDropdown(
+                  label: 'Enrollment Type',
+                  items: enrollmentTypeItems,
+                  controller: enrollmentTypeController,
+                  setState: setState,
+                ),
+              ),
+              const SizedBox(width: 12),
+              Expanded(
+                child: _buildStatusDropdown(
+                  label: 'Plan Type',
+                  items: _localPlanTypeItems,
+                  controller: planTypeController,
+                  setState: setState,
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 14),
+          Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Expanded(
+                child: _buildStatusDropdown(
+                  label: 'Room & Board Type',
+                  items: roomBoardTypeItems,
+                  controller: roomAndBoardTypeController,
+                  setState: setState,
+                ),
+              ),
+              const SizedBox(width: 12),
+              Expanded(
+                child: CustomTextFormField(
+                  label: const Row(children: [
+                    Text('Room & Board Limit',
+                        style: TextStyle(color: Colors.black)),
+                    Text(' *', style: TextStyle(color: Colors.red)),
+                  ]),
+                  labelStyle: const TextStyle(
+                      color: Color(0xff13322b), fontSize: 13),
+                  controller: roomAndBoardLimitController,
+                  isNumeric: true,
+                  maxLength: 5,
+                  validator: (value) {
+                    if (value == null || value.isEmpty) {
+                      return 'Required';
+                    }
+                    return null;
+                  },
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 14),
+          Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Expanded(
+                child: _buildStatusDropdown(
+                  label: 'Benefit Limit Type',
+                  items: benefitTypeItems,
+                  controller: benefitLimitTypeController,
+                  setState: setState,
+                ),
+              ),
+              const SizedBox(width: 12),
+              Expanded(
+                child: CustomTextFormField(
+                  label: const Row(children: [
+                    Text('Benefit Limit',
+                        style: TextStyle(color: Colors.black)),
+                    Text(' *', style: TextStyle(color: Colors.red)),
+                  ]),
+                  labelStyle: const TextStyle(
+                      color: Color(0xff13322b), fontSize: 13),
+                  controller: benefitLimitController,
+                  isNumeric: true,
+                  maxLength: 6,
+                  validator: (value) {
+                    if (value == null || value.isEmpty) {
+                      return 'Required';
+                    }
+                    return null;
+                  },
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 28),
+          Row(
+            children: [
+              const Expanded(
+                child: Text('Card Details',
+                    style: TextStyle(
+                        fontSize: 14,
+                        fontWeight: FontWeight.w700,
+                        color: Color(0xff13322b),
+                        letterSpacing: 0.2)),
+              ),
+              TextButton.icon(
+                onPressed: () async {
+                  final updated =
+                      await _showPlanTypeManagerDialog(ctx);
+                  if (updated) setState(() {});
+                },
+                icon: const Icon(Icons.tune,
+                    size: 14, color: Color(0xff13322b)),
+                label: const Text('Manage Plans',
+                    style: TextStyle(
+                        color: Color(0xff13322b), fontSize: 12)),
+              ),
+            ],
+          ),
+          const SizedBox(height: 4),
+          Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    const Text('Card Type *',
+                        style: TextStyle(
+                            fontSize: 13,
+                            color: Color(0xff13322b),
+                            fontWeight: FontWeight.w500)),
+                    const SizedBox(height: 6),
+                    DropdownButtonFormField<int>(
+                      value: _selectedCardVariantId,
+                      dropdownColor: Colors.white,
+                      iconEnabledColor: const Color(0xff13322b),
+                      decoration: InputDecoration(
+                        contentPadding: const EdgeInsets.symmetric(
+                            horizontal: 12, vertical: 10),
+                        border: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(5),
+                          borderSide: const BorderSide(
+                              color: Color(0xff13322b), width: 1.5),
+                        ),
+                        enabledBorder: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(5),
+                          borderSide: BorderSide(
+                              color: const Color(0xff13322b).withOpacity(0.35),
+                              width: 1.5),
+                        ),
+                        focusedBorder: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(5),
+                          borderSide: const BorderSide(
+                              color: Color(0xff13322b), width: 2.0),
+                        ),
+                        filled: true,
+                        fillColor: Colors.white,
+                      ),
+                      hint: const Text('Select Card Type',
+                          style: TextStyle(
+                              color: Color(0xffBDC9CA), fontSize: 13)),
+                      items: _cardVariants.map((variant) {
+                        return DropdownMenuItem<int>(
+                          value: variant['card_variant_id'],
+                          child: Text(
+                            variant['card_name'] ??
+                                variant['card_variant'] ??
+                                '',
+                            style: const TextStyle(
+                                color: Color(0xff13322b), fontSize: 13),
+                          ),
+                        );
+                      }).toList(),
+                      onChanged: (value) {
+                        setState(() {
+                          _selectedCardVariantId = value;
+                          final selected = _cardVariants.firstWhere(
+                            (v) => v['card_variant_id'] == value,
+                            orElse: () => {},
+                          );
+                          cardTypeController.text =
+                              selected['card_name'] ?? '';
+                        });
+                      },
+                      validator: (value) => null,
+                    ),
+                  ],
+                ),
+              ),
+              const SizedBox(width: 12),
+              Expanded(
+                child: CustomTextFormField(
+                  label: const Row(children: [
+                    Text('Card Number',
+                        style: TextStyle(color: Colors.black)),
+                    Text(' *', style: TextStyle(color: Colors.red)),
+                  ]),
+                  labelStyle: const TextStyle(
+                      color: Color(0xff13322b), fontSize: 13),
+                  controller: cardNumberController,
+                  isNumeric: true,
+                  maxLength: 16,
+                  validator: (value) {
+                    if (value == null || value.length != 16) {
+                      return 'Card number must be 16 digits';
+                    }
+                    return null;
+                  },
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 14),
+          Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Expanded(
+                child: _buildDatePickerField(
+                  label: 'Effective Date',
+                  controller: ecardEffectiveController,
+                  setState: setState,
+                  initialDate: DateTime.now(),
+                ),
+              ),
+              const SizedBox(width: 12),
+              Expanded(
+                child: _buildDatePickerField(
+                  label: 'Expiry Date',
+                  controller: ecardExpiryController,
+                  setState: setState,
+                  initialDate: DateTime.now().add(const Duration(days: 365)),
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 8),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildDatePickerField({
+    required String label,
+    required TextEditingController controller,
+    required StateSetter setState,
+    required DateTime initialDate,
+  }) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(label,
+            style: const TextStyle(
+                fontSize: 13,
+                color: Color(0xff13322b),
+                fontWeight: FontWeight.w500)),
+        const SizedBox(height: 6),
+        GestureDetector(
+          onTap: () async {
+            final picked = await showDatePicker(
+              context: context,
+              initialDate: controller.text.isNotEmpty
+                  ? (DateTime.tryParse(controller.text) ?? initialDate)
+                  : initialDate,
+              firstDate: DateTime(2020),
+              lastDate: DateTime(2040),
+              builder: (context, child) {
+                return Theme(
+                  data: Theme.of(context).copyWith(
+                    colorScheme: const ColorScheme.light(
+                        primary: Color(0xff13322b)),
+                  ),
+                  child: child!,
+                );
+              },
+            );
+            if (picked != null) {
+              setState(() {
+                controller.text = picked.toIso8601String().split('T')[0];
+              });
+            }
+          },
+          child: AbsorbPointer(
+            child: TextFormField(
+              controller: controller,
+              readOnly: true,
+              style: const TextStyle(
+                  color: Color(0xff13322b), fontSize: 13),
+              decoration: InputDecoration(
+                hintText: 'yyyy-mm-dd',
+                hintStyle: TextStyle(
+                    color: const Color(0xff13322b).withOpacity(0.4),
+                    fontSize: 13),
+                contentPadding: const EdgeInsets.symmetric(
+                    horizontal: 12, vertical: 14),
+                border: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(5),
+                  borderSide: BorderSide(
+                      color: const Color(0xff13322b).withOpacity(0.35),
+                      width: 1.5),
+                ),
+                enabledBorder: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(5),
+                  borderSide: BorderSide(
+                      color: const Color(0xff13322b).withOpacity(0.35),
+                      width: 1.5),
+                ),
+                focusedBorder: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(5),
+                  borderSide: const BorderSide(
+                      color: Color(0xff13322b), width: 2.0),
+                ),
+                filled: true,
+                fillColor: Colors.white,
+                suffixIcon: const Icon(Icons.calendar_today,
+                    size: 16, color: Color(0xff13322b)),
+              ),
+            ),
+          ),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildStatusDropdown({
+    required String label,
+    required List<StatusItem> items,
+    required TextEditingController controller,
+    required StateSetter setState,
+  }) {
+    int? selectedId = int.tryParse(controller.text);
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(label,
+            style: const TextStyle(
+                fontSize: 13,
+                color: Color(0xff13322b),
+                fontWeight: FontWeight.w500)),
+        const SizedBox(height: 6),
+        DropdownButtonFormField<int>(
+          value: selectedId,
+          dropdownColor: Colors.white,
+          iconEnabledColor: const Color(0xff13322b),
+          isExpanded: true,
+          decoration: InputDecoration(
+            contentPadding:
+                const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+            border: OutlineInputBorder(
+              borderRadius: BorderRadius.circular(5),
+              borderSide: const BorderSide(
+                  color: Color(0xff13322b), width: 1.5),
+            ),
+            enabledBorder: OutlineInputBorder(
+              borderRadius: BorderRadius.circular(5),
+              borderSide: BorderSide(
+                  color: const Color(0xff13322b).withOpacity(0.35),
+                  width: 1.5),
+            ),
+            focusedBorder: OutlineInputBorder(
+              borderRadius: BorderRadius.circular(5),
+              borderSide: const BorderSide(
+                  color: Color(0xff13322b), width: 2.0),
+            ),
+            filled: true,
+            fillColor: Colors.white,
+          ),
+          hint: Text('Select $label',
+              style: TextStyle(
+                  color: const Color(0xff13322b).withOpacity(0.4),
+                  fontSize: 13)),
+          items: items.map((item) {
+            return DropdownMenuItem<int>(
+              value: item.id,
+              child: Text(
+                item.status,
+                style: const TextStyle(
+                    color: Color(0xff13322b), fontSize: 13),
+                overflow: TextOverflow.ellipsis,
+              ),
+            );
+          }).toList(),
+          onChanged: (value) {
+            setState(() {
+              controller.text = value?.toString() ?? '';
+            });
+          },
+          validator: (value) => null,
+        ),
+      ],
+    );
+  }
+
+  Widget _buildStep3Confirm(BuildContext ctx, StateSetter setState) {
+    if (isLoading) {
+      return const SizedBox(
+        height: 300,
+        child: Center(
+          child: SpinKitCircle(
+            color: Color(0xff13322B),
+            size: 50.0,
+          ),
+        ),
+      );
+    }
+    return SingleChildScrollView(
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          _buildConfirmSection('Name & Contact', 0, setState, [
+            _confirmRow('First Name',
+                fnameController.text.isEmpty ? '-' : fnameController.text),
+            _confirmRow('Middle Name',
+                mnameController.text.isEmpty ? '-' : mnameController.text),
+            _confirmRow('Last Name',
+                lnameController.text.isEmpty ? '-' : lnameController.text),
+            _confirmRow('Contact No',
+                contactNoController.text.isEmpty ? '-' : contactNoController.text),
+            _confirmRow('Email',
+                emailController.text.isEmpty ? '-' : emailController.text),
+          ]),
+          const SizedBox(height: 12),
+          _buildConfirmSection('Personal & Address', 1, setState, [
+            _confirmRow('Sex', _selectedSex ?? '-'),
+            _confirmRow('Birthday',
+                _birthday != null ? "${_birthday?.toLocal()}".split(' ')[0] : '-'),
+            _confirmRow('Civil Status',
+                civilStatusController.text.isEmpty ? '-' : civilStatusController.text),
+            _confirmRow('House Address',
+                houseAddressController.text.isEmpty ? '-' : houseAddressController.text),
+            _confirmRow('Region',
+                regionController.text.isEmpty ? '-' : regionController.text),
+            _confirmRow('Province',
+                provinceController.text.isEmpty ? '-' : provinceController.text),
+            _confirmRow('City',
+                cityController.text.isEmpty ? '-' : cityController.text),
+            _confirmRow('Barangay',
+                barangayController.text.isEmpty ? '-' : barangayController.text),
+            _confirmRow('Postal Code',
+                postalCodeController.text.isEmpty ? '-' : postalCodeController.text),
+          ]),
+          const SizedBox(height: 12),
+          _buildConfirmSection('Plan & Card', 2, setState, [
+            _confirmRow('Member Type',
+                memberTypeController.text.isEmpty ? '-' : memberTypeController.text),
+            _confirmRow('Enrollment Type',
+                enrollmentTypeController.text.isEmpty ? '-' : enrollmentTypeController.text),
+            _confirmRow('Plan Type',
+                planTypeController.text.isEmpty ? '-' : planTypeController.text),
+            _confirmRow('Room & Board Limit',
+                roomAndBoardLimitController.text.isEmpty ? '-' : roomAndBoardLimitController.text),
+            _confirmRow('Benefit Limit',
+                benefitLimitController.text.isEmpty ? '-' : benefitLimitController.text),
+            _confirmRow('Card Type',
+                _selectedCardVariantId != null
+                    ? (_cardVariants.firstWhere(
+                            (v) => v['card_variant_id'] == _selectedCardVariantId,
+                            orElse: () => {})['card_name'] ??
+                        '-')
+                    : '-'),
+            _confirmRow('Card Number',
+                cardNumberController.text.isEmpty ? '-' : cardNumberController.text),
+            _confirmRow('Effective Date',
+                ecardEffectiveController.text.isEmpty ? '-' : ecardEffectiveController.text),
+            _confirmRow('Expiry Date',
+                ecardExpiryController.text.isEmpty ? '-' : ecardExpiryController.text),
+          ]),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildDialogFooter(BuildContext ctx, StateSetter setState) {
+    final isLast = _addMemberStep == 2;
+    return Container(
+      padding: const EdgeInsets.fromLTRB(24, 14, 24, 18),
+      decoration: const BoxDecoration(
+        border: Border(
+          top: BorderSide(color: Color(0xffE8ECEF), width: 1),
+        ),
+      ),
+      child: Row(
+        children: [
+          if (_addMemberStep > 0)
+            Expanded(
+              child: OutlinedButton(
+                onPressed: () => setState(() => _addMemberStep--),
+                style: OutlinedButton.styleFrom(
+                  side: const BorderSide(
+                      color: Color(0xff13322b), width: 1.2),
+                  shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(8)),
+                  padding: const EdgeInsets.symmetric(vertical: 14),
+                ),
+                child: const Text('Back',
+                    style: TextStyle(
+                        color: Color(0xff13322b),
+                        fontWeight: FontWeight.w600)),
+              ),
+            ),
+          if (_addMemberStep > 0) const SizedBox(width: 12),
+          Expanded(
+            flex: 2,
+            child: ElevatedButton(
+              onPressed: isLoading
+                  ? null
+                  : () {
+                      if (!isLast) {
+                        if (!_validateCurrentStep(setState)) return;
+                        setState(() => _addMemberStep++);
+                      } else {
+                        if (!_formKey.currentState!.validate()) return;
+                        if (!_formKey2.currentState!.validate()) return;
+                        addMember(setState);
+                        setState(() => isLoading = true);
+                      }
+                    },
+              style: ElevatedButton.styleFrom(
+                backgroundColor: const Color(0xff13322b),
+                shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(8)),
+                padding: const EdgeInsets.symmetric(vertical: 14),
+                elevation: 0,
+              ),
+              child: isLoading
+                  ? const SizedBox(
+                      width: 20,
+                      height: 20,
+                      child: CircularProgressIndicator(
+                        color: Colors.white,
+                        strokeWidth: 2.5,
+                      ),
+                    )
+                  : Text(
+                      isLast ? 'Submit' : 'Continue',
+                      style: const TextStyle(
+                          color: Colors.white,
+                          fontWeight: FontWeight.w600,
+                          fontSize: 15),
+                    ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  bool _validateCurrentStep(StateSetter setState) {
+    if (_addMemberStep == 0) {
+      if (!_formKey.currentState!.validate()) return false;
+      if (_selectedSex == null) {
+        setState(() => noSex = true);
+        return false;
+      }
+      if (_birthday == null) {
+        setState(() {
+          isDateError = true;
+          dateLabel = 'Birthday is required';
+        });
+        return false;
+      }
+      final age = calculateAge(_birthday.toString());
+      if (age < 16) {
+        setState(() {
+          isDateError = true;
+          noSex = false;
+          _birthday = null;
+          dateLabel = 'Invalid date; age must be 16 or older.';
+        });
+        return false;
+      }
+      return true;
+    } else if (_addMemberStep == 1) {
+      if (!_formKey2.currentState!.validate()) return false;
+      if (roomAndBoardLimitController.text.isEmpty ||
+          benefitLimitController.text.isEmpty ||
+          cardNumberController.text.length != 16) {
+        return false;
+      }
+      return true;
+    }
+    return true;
+  }
+
   void _showDialog(BuildContext context, StateSetter setState) {
     _addMemberStep = 0;
 
@@ -4627,6 +5968,7 @@ class _UserManagementPageState extends State<UserManagementPage> {
         isDateError = false;
         dateLabel = 'yyyy-mm-dd';
         _addMemberStep = 0;
+        _selectedCardVariantId = null;
         memberTypeController.text = '1';
         enrollmentTypeController.text = '1';
         planTypeController.text = _defaultPlanTypeId().toString();
@@ -4652,7 +5994,7 @@ class _UserManagementPageState extends State<UserManagementPage> {
                 width: MediaQuery.of(dialogContext).size.width * 0.9 > 900
                     ? 900
                     : MediaQuery.of(dialogContext).size.width * 0.9,
-                height: 850,
+                height: 820,
                 decoration: BoxDecoration(
                   color: Colors.white,
                   borderRadius: BorderRadius.circular(20),
@@ -4713,1266 +6055,18 @@ class _UserManagementPageState extends State<UserManagementPage> {
                       ),
                     ),
                     const SizedBox(height: 10),
-                    // Stepper
+                    // Custom pill-style stepper header (replaces the default Stepper header)
+                    Padding(
+                      padding: const EdgeInsets.symmetric(horizontal: 20),
+                      child: _buildPillStepperHeader(dialogSetState),
+                    ),
                     Expanded(
-                      child: Padding(
-                        padding: const EdgeInsets.symmetric(horizontal: 20),
-                        child: Stepper(
-                          type: StepperType.horizontal,
-                          currentStep: _addMemberStep,
-                          onStepContinue: () {
-                            if (_addMemberStep == 0) {
-                              if (!_formKey.currentState!.validate()) return;
-                              dialogSetState(() => _addMemberStep++);
-                            } else if (_addMemberStep == 1) {
-                              if (_birthday == null) {
-                                dialogSetState(() {
-                                  isDateError = true;
-                                  dateLabel = 'Birthday is required';
-                                });
-                                return;
-                              }
-                              int age = calculateAge(_birthday.toString());
-                              if (age < 16) {
-                                dialogSetState(() {
-                                  isDateError = true;
-                                  noSex = false;
-                                  _birthday = null;
-                                  dateLabel =
-                                      'Invalid date; age must be 16 or older.';
-                                });
-                                return;
-                              }
-                              if (_selectedSex == null) {
-                                dialogSetState(() => noSex = true);
-                                return;
-                              }
-                              dialogSetState(() => _addMemberStep++);
-                            } else if (_addMemberStep == 2) {
-                              if (roomAndBoardLimitController.text.isEmpty ||
-                                  benefitLimitController.text.isEmpty ||
-                                  cardNumberController.text.length != 16) {
-                                if (!_formKey2.currentState!.validate())
-                                  return;
-                                if (roomAndBoardLimitController.text.isEmpty) {
-                                  ScaffoldMessenger.of(dialogContext)
-                                      .showSnackBar(const SnackBar(
-                                          content: Text(
-                                              'Room and board limit is required')));
-                                  return;
-                                }
-                                if (benefitLimitController.text.isEmpty) {
-                                  ScaffoldMessenger.of(dialogContext)
-                                      .showSnackBar(const SnackBar(
-                                          content: Text(
-                                              'Benefit limit is required')));
-                                  return;
-                                }
-                                if (cardNumberController.text.length != 16) {
-                                  ScaffoldMessenger.of(dialogContext)
-                                      .showSnackBar(const SnackBar(
-                                          content: Text(
-                                              'Card number must be 16 digits')));
-                                  return;
-                                }
-                              }
-                              dialogSetState(() => _addMemberStep++);
-                            }
-                          },
-                          onStepCancel: () {
-                            if (_addMemberStep > 0) {
-                              dialogSetState(() => _addMemberStep--);
-                            }
-                          },
-                          onStepTapped: (step) {
-                            if (step < _addMemberStep) {
-                              dialogSetState(() => _addMemberStep = step);
-                            }
-                          },
-                          controlsBuilder: (context, details) {
-                            return Padding(
-                              padding: const EdgeInsets.only(top: 20),
-                              child: Row(
-                                mainAxisAlignment: MainAxisAlignment.center,
-                                children: [
-                                  if (_addMemberStep > 0)
-                                    SizedBox(
-                                      width: 200,
-                                      height: 40,
-                                      child: ElevatedButton(
-                                        onPressed: details.onStepCancel,
-                                        style: ElevatedButton.styleFrom(
-                                          shape: RoundedRectangleBorder(
-                                            borderRadius:
-                                                BorderRadius.circular(5),
-                                            side: const BorderSide(
-                                                color: Color(0xff13322b)),
-                                          ),
-                                          backgroundColor: Colors.white,
-                                        ),
-                                        child: const Text('Back',
-                                            style: TextStyle(
-                                                color: Colors.black)),
-                                      ),
-                                    ),
-                                  if (_addMemberStep > 0)
-                                    const SizedBox(width: 10),
-                                  if (_addMemberStep < 3)
-                                    SizedBox(
-                                      width: 200,
-                                      height: 40,
-                                      child: ElevatedButton(
-                                        onPressed: details.onStepContinue,
-                                        style: ElevatedButton.styleFrom(
-                                          shape: RoundedRectangleBorder(
-                                            borderRadius:
-                                                BorderRadius.circular(5),
-                                          ),
-                                          backgroundColor:
-                                              const Color(0xff13322b),
-                                        ),
-                                        child: Text(
-                                          _addMemberStep == 2
-                                              ? 'Review'
-                                              : 'Next',
-                                          style: const TextStyle(
-                                              color: Colors.white),
-                                        ),
-                                      ),
-                                    ),
-                                  if (_addMemberStep == 3) ...[
-                                    SizedBox(
-                                      width: 200,
-                                      height: 40,
-                                      child: ElevatedButton(
-                                        onPressed: () {
-                                          _resetForm(dialogSetState);
-                                          Navigator.pop(dialogContext);
-                                        },
-                                        style: ElevatedButton.styleFrom(
-                                          shape: RoundedRectangleBorder(
-                                            borderRadius:
-                                                BorderRadius.circular(5),
-                                            side: const BorderSide(
-                                                color: Color(0xff13322b)),
-                                          ),
-                                          backgroundColor: Colors.white,
-                                        ),
-                                        child: const Text('Close',
-                                            style: TextStyle(
-                                                color: Colors.black)),
-                                      ),
-                                    ),
-                                    const SizedBox(width: 10),
-                                    SizedBox(
-                                      width: 200,
-                                      height: 40,
-                                      child: ElevatedButton(
-                                        onPressed: isLoading
-                                            ? null
-                                            : () {
-                                                if (!_formKey.currentState!
-                                                    .validate()) return;
-                                                if (!_formKey2.currentState!
-                                                    .validate()) return;
-                                                if (roomAndBoardLimitController
-                                                        .text.isEmpty ||
-                                                    benefitLimitController
-                                                        .text.isEmpty ||
-                                                    cardNumberController
-                                                            .text.length !=
-                                                        16) {
-                                                  if (roomAndBoardLimitController
-                                                      .text
-                                                      .isEmpty) {
-                                                    ScaffoldMessenger.of(
-                                                            dialogContext)
-                                                        .showSnackBar(
-                                                            const SnackBar(
-                                                                content: Text(
-                                                                    'Room and board limit is required')));
-                                                    return;
-                                                  }
-                                                  if (benefitLimitController
-                                                      .text.isEmpty) {
-                                                    ScaffoldMessenger.of(
-                                                            dialogContext)
-                                                        .showSnackBar(
-                                                            const SnackBar(
-                                                                content: Text(
-                                                                    'Benefit limit is required')));
-                                                    return;
-                                                  }
-                                                  if (cardNumberController
-                                                          .text.length !=
-                                                      16) {
-                                                    ScaffoldMessenger.of(
-                                                            dialogContext)
-                                                        .showSnackBar(
-                                                            const SnackBar(
-                                                                content: Text(
-                                                                    'Card number must be 16 digits')));
-                                                    return;
-                                                  }
-                                                }
-                                                addMember(dialogSetState);
-                                                dialogSetState(() {
-                                                  isLoading = true;
-                                                });
-                                              },
-                                        style: ElevatedButton.styleFrom(
-                                          shape: RoundedRectangleBorder(
-                                            borderRadius:
-                                                BorderRadius.circular(5),
-                                          ),
-                                          backgroundColor:
-                                              const Color(0xff13322b),
-                                        ),
-                                        child: const Text("Submit",
-                                            style: TextStyle(
-                                                color: Colors.white)),
-                                      ),
-                                    ),
-                                  ],
-                                ],
-                              ),
-                            );
-                          },
-                          steps: [
-                            // Step 1: Name & Contact
-                            Step(
-                              title: const Text('Name',
-                                  style: TextStyle(fontSize: 12)),
-                              isActive: _addMemberStep >= 0,
-                              state: _addMemberStep > 0
-                                  ? StepState.complete
-                                  : StepState.indexed,
-                              content: Form(
-                                key: _formKey,
-                                child: Column(
-                                  crossAxisAlignment: CrossAxisAlignment.start,
-                                  children: [
-                                    const Text("Name and Contact Information",
-                                        style: TextStyle(
-                                            fontWeight: FontWeight.bold,
-                                            color: Color(0xff13322b))),
-                                    const SizedBox(height: 10),
-                                    Row(
-                                      children: [
-                                        Expanded(
-                                          child: CustomTextFormField(
-                                            label: const Row(children: [
-                                              Text('First Name',
-                                                  style: TextStyle(
-                                                      color: Colors.black)),
-                                              Text(' *',
-                                                  style: TextStyle(
-                                                      color: Colors.red)),
-                                            ]),
-                                            labelStyle: const TextStyle(
-                                                color: Color(0xff13322b),
-                                                fontSize: 14),
-                                            controller: fnameController,
-                                            isNumeric: false,
-                                            validator: (value) {
-                                              if (value == null ||
-                                                  value.isEmpty) {
-                                                return 'First name is required';
-                                              }
-                                              return null;
-                                            },
-                                          ),
-                                        ),
-                                        const SizedBox(width: 10),
-                                        Expanded(
-                                          child: CustomTextFormField(
-                                            label: const Row(children: [
-                                              Text('Middle Name',
-                                                  style: TextStyle(
-                                                      color: Colors.black)),
-                                            ]),
-                                            labelStyle: const TextStyle(
-                                                color: Color(0xff13322b),
-                                                fontSize: 14),
-                                            controller: mnameController,
-                                            isNumeric: false,
-                                            validator: (value) => null,
-                                          ),
-                                        ),
-                                        const SizedBox(width: 10),
-                                        Expanded(
-                                          child: CustomTextFormField(
-                                            label: const Row(children: [
-                                              Text('Last Name',
-                                                  style: TextStyle(
-                                                      color: Colors.black)),
-                                              Text(' *',
-                                                  style: TextStyle(
-                                                      color: Colors.red)),
-                                            ]),
-                                            labelStyle: const TextStyle(
-                                                color: Color(0xff13322b),
-                                                fontSize: 14),
-                                            controller: lnameController,
-                                            isNumeric: false,
-                                            validator: (value) {
-                                              if (value == null ||
-                                                  value.isEmpty) {
-                                                return 'Last name is required';
-                                              }
-                                              return null;
-                                            },
-                                          ),
-                                        ),
-                                      ],
-                                    ),
-                                    const SizedBox(height: 10),
-                                    Row(
-                                      children: [
-                                        Expanded(
-                                          child: CustomTextFormField(
-                                            label: const Row(children: [
-                                              Text('Contact No',
-                                                  style: TextStyle(
-                                                      color: Colors.black)),
-                                              Text(' *',
-                                                  style: TextStyle(
-                                                      color: Colors.red)),
-                                            ]),
-                                            labelStyle: const TextStyle(
-                                                color: Color(0xff13322b),
-                                                fontSize: 14),
-                                            controller: contactNoController,
-                                            isNumeric: true,
-                                            validator: (value) {
-                                              final regExp =
-                                                  RegExp(r'^\d+$');
-                                              if (value != null &&
-                                                  value.isNotEmpty &&
-                                                  !regExp.hasMatch(value)) {
-                                                return 'Please enter a valid number';
-                                              }
-                                              return null;
-                                            },
-                                            maxLength: 11,
-                                          ),
-                                        ),
-                                        const SizedBox(width: 10),
-                                        Expanded(
-                                          child: CustomTextFormField(
-                                            label: const Row(children: [
-                                              Text('Email Address',
-                                                  style: TextStyle(
-                                                      color: Colors.black)),
-                                              Text(' *',
-                                                  style: TextStyle(
-                                                      color: Colors.red)),
-                                            ]),
-                                            labelStyle: const TextStyle(
-                                                color: Color(0xff13322b),
-                                                fontSize: 14),
-                                            controller: emailController,
-                                            isNumeric: false,
-                                            isEmail: true,
-                                            validator: (value) {
-                                              if (value!.isNotEmpty) {
-                                                final regExp = RegExp(
-                                                    r'^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$');
-                                                if (value == null ||
-                                                    value.isEmpty) {
-                                                  return 'Email address is required';
-                                                } else if (value.length < 6) {
-                                                  return 'Email address must be at least 6 characters long';
-                                                } else if (!regExp
-                                                    .hasMatch(value)) {
-                                                  return 'Please input a valid email';
-                                                }
-                                              }
-                                              return null;
-                                            },
-                                          ),
-                                        ),
-                                      ],
-                                    ),
-                                  ],
-                                ),
-                              ),
-                            ),
-
-                            // Step 2: Personal & Address
-                            Step(
-                              title: const Text('Details',
-                                  style: TextStyle(fontSize: 12)),
-                              isActive: _addMemberStep >= 1,
-                              state: _addMemberStep > 1
-                                  ? StepState.complete
-                                  : StepState.indexed,
-                              content: Column(
-                                crossAxisAlignment: CrossAxisAlignment.start,
-                                children: [
-                                  const Text("Personal Details",
-                                      style: TextStyle(
-                                          fontWeight: FontWeight.bold,
-                                          color: Color(0xff13322b))),
-                                  const SizedBox(height: 10),
-                                  Row(
-                                    children: [
-                                      Expanded(
-                                        child: Column(
-                                          crossAxisAlignment:
-                                              CrossAxisAlignment.start,
-                                          children: [
-                                            Row(
-                                              children: [
-                                                const Text("Sex:",
-                                                    style: TextStyle(
-                                                        color: Color(
-                                                            0xff13322b))),
-                                                Expanded(
-                                                  child: Row(
-                                                    children: [
-                                                      SizedBox(
-                                                        width: 120,
-                                                        child: RadioListTile<
-                                                            String>(
-                                                          title: const Text(
-                                                              "Male",
-                                                              style: TextStyle(
-                                                                  color: Color(
-                                                                      0xff13322b),
-                                                                  fontSize:
-                                                                      12)),
-                                                          value: "Male",
-                                                          groupValue:
-                                                              _selectedSex,
-                                                          onChanged: (value) {
-                                                            dialogSetState(() =>
-                                                                _selectedSex =
-                                                                    value);
-                                                          },
-                                                          activeColor:
-                                                              const Color(
-                                                                  0xff13322b),
-                                                        ),
-                                                      ),
-                                                      Expanded(
-                                                        child: SizedBox(
-                                                          width: 130,
-                                                          child:
-                                                              RadioListTile<
-                                                                  String>(
-                                                            title: const Text(
-                                                                "Female",
-                                                                style: TextStyle(
-                                                                    color: Color(
-                                                                        0xff13322b),
-                                                                    fontSize:
-                                                                        12)),
-                                                            value: "Female",
-                                                            groupValue:
-                                                                _selectedSex,
-                                                            onChanged: (value) {
-                                                              dialogSetState(() =>
-                                                                  _selectedSex =
-                                                                      value);
-                                                            },
-                                                            activeColor:
-                                                                const Color(
-                                                                    0xff13322b),
-                                                          ),
-                                                        ),
-                                                      ),
-                                                    ],
-                                                  ),
-                                                ),
-                                              ],
-                                            ),
-                                          ],
-                                        ),
-                                      ),
-                                      const SizedBox(width: 10),
-                                      Expanded(
-                                        child: Container(
-                                          height: 50,
-                                          decoration: BoxDecoration(
-                                            border: Border.all(
-                                                color: Color(!isDateError
-                                                        ? 0xff13322b
-                                                        : 0xffff0000)
-                                                    .withOpacity(!isDateError
-                                                        ? 0.5
-                                                        : 0.25)),
-                                            borderRadius:
-                                                BorderRadius.circular(5),
-                                          ),
-                                          child: GestureDetector(
-                                            onTap: () {
-                                              dialogSetState(() =>
-                                                  isDateError = false);
-                                              _selectDate(dialogContext,
-                                                  dialogSetState,
-                                                  _birthday.toString());
-                                            },
-                                            child: Padding(
-                                              padding:
-                                                  const EdgeInsets.fromLTRB(
-                                                      15, 11, 0, 0),
-                                              child: Text(
-                                                _birthday != null
-                                                    ? "${_birthday?.toLocal()}"
-                                                        .split(' ')[0]
-                                                    : dateLabel,
-                                                textAlign: TextAlign.left,
-                                                style: TextStyle(
-                                                  color: Color(!isDateError
-                                                          ? 0xff13322b
-                                                          : 0xffff0000)
-                                                      .withOpacity(
-                                                          !isDateError
-                                                              ? 1
-                                                              : 0.35),
-                                                  fontSize: 15.0,
-                                                ),
-                                              ),
-                                            ),
-                                          ),
-                                        ),
-                                      ),
-                                      const SizedBox(width: 10),
-                                      Expanded(
-                                        child: CustomStringDropdownFormField(
-                                          label: 'Civil Status',
-                                          labelStyle: const TextStyle(
-                                              color: Color(0xff13322b)),
-                                          items: civilStatusTypeItems,
-                                          controller: civilStatusController,
-                                          onChanged: (selectedItem) {},
-                                        ),
-                                      ),
-                                    ],
-                                  ),
-                                  const SizedBox(height: 20),
-                                  const Text("Address Information",
-                                      style: TextStyle(
-                                          fontWeight: FontWeight.bold,
-                                          color: Color(0xff13322b))),
-                                  const SizedBox(height: 10),
-                                  Row(
-                                    children: [
-                                      Expanded(
-                                        child: CustomTextFormField(
-                                          label: const Row(children: [
-                                            Text('House Address',
-                                                style: TextStyle(
-                                                    color: Colors.black)),
-                                          ]),
-                                          labelStyle: const TextStyle(
-                                              color: Color(0xff13322b),
-                                              fontSize: 14),
-                                          controller: houseAddressController,
-                                          isNumeric: false,
-                                          validator: (value) => null,
-                                        ),
-                                      ),
-                                      const SizedBox(width: 10),
-                                      Expanded(
-                                        child: CustomDropdown<Region>(
-                                          items: regions,
-                                          itemAsString: (region) =>
-                                              region.regionName,
-                                          hintText: 'Select Region',
-                                          selectedItem: regions.firstWhere(
-                                            (region) =>
-                                                region.code == selectedRegion,
-                                            orElse: () => Region(
-                                                code: '',
-                                                regionName: 'Select Region'),
-                                          ),
-                                          onChanged: (Region? newValue) {
-                                            dialogSetState(() {
-                                              selectedRegion = newValue?.code;
-                                              eregionController.text =
-                                                  newValue!.regionName;
-                                              fetchProvinces(
-                                                  selectedRegion!, dialogSetState);
-                                              provinces.clear();
-                                              cities.clear();
-                                              barangays.clear();
-                                            });
-                                          },
-                                        ),
-                                      ),
-                                      const SizedBox(width: 10),
-                                      Expanded(
-                                        child: CustomDropdown<Province>(
-                                          items: provinces,
-                                          itemAsString: (province) =>
-                                              province.name,
-                                          hintText: 'Select Province',
-                                          selectedItem: provinces.firstWhere(
-                                            (province) =>
-                                                province.code ==
-                                                selectedProvince,
-                                            orElse: () => Province(
-                                                code: '', name: 'Select Province'),
-                                          ),
-                                          onChanged: (Province? newValue) {
-                                            dialogSetState(() {
-                                              selectedProvince = newValue?.code;
-                                              provinceController.text =
-                                                  newValue!.name;
-                                              fetchCities(
-                                                  selectedProvince!, dialogSetState);
-                                              cities.clear();
-                                              barangays.clear();
-                                            });
-                                          },
-                                        ),
-                                      ),
-                                    ],
-                                  ),
-                                  const SizedBox(height: 10),
-                                  Row(
-                                    children: [
-                                      Expanded(
-                                        child: CustomDropdown<City>(
-                                          items: cities,
-                                          itemAsString: (city) => city.name,
-                                          hintText: 'Select City',
-                                          selectedItem: cities.firstWhere(
-                                            (city) =>
-                                                city.code == selectedCity,
-                                            orElse: () => City(
-                                                code: '', name: 'Select City'),
-                                          ),
-                                          onChanged: (City? newValue) {
-                                            dialogSetState(() {
-                                              selectedCity = newValue?.code;
-                                              cityController.text =
-                                                  newValue!.name;
-                                              fetchBarangays(
-                                                  selectedCity!, dialogSetState);
-                                              barangays.clear();
-                                            });
-                                          },
-                                        ),
-                                      ),
-                                      const SizedBox(width: 10),
-                                      Expanded(
-                                        child: CustomDropdown<Barangay>(
-                                          items: barangays,
-                                          itemAsString: (brgy) => brgy.name,
-                                          hintText: 'Select Barangay',
-                                          selectedItem: barangays.firstWhere(
-                                            (brgy) =>
-                                                brgy.code == selectedBarangay,
-                                            orElse: () => Barangay(
-                                                code: '',
-                                                name: 'Select Barangay',
-                                                postal: ''),
-                                          ),
-                                          onChanged: (Barangay? newValue) {
-                                            dialogSetState(() {
-                                              selectedBarangay = newValue?.code;
-                                              barangayController.text =
-                                                  newValue!.name;
-                                              postalCodeController.text =
-                                                  newValue.postal;
-                                            });
-                                          },
-                                        ),
-                                      ),
-                                      const SizedBox(width: 10),
-                                      Expanded(
-                                        child: CustomTextFormField(
-                                          label: const Row(children: [
-                                            Text('Postal Code',
-                                                style: TextStyle(
-                                                    color: Colors.black)),
-                                          ]),
-                                          labelStyle: const TextStyle(
-                                              color: Color(0xff13322b),
-                                              fontSize: 14),
-                                          controller: postalCodeController,
-                                          isNumeric: true,
-                                          validator: (value) => null,
-                                          maxLength: 4,
-                                        ),
-                                      ),
-                                    ],
-                                  ),
-                                ],
-                              ),
-                            ),
-
-                            // Step 3: Plan & Card Details
-                            Step(
-                              title: const Text('Plan',
-                                  style: TextStyle(fontSize: 12)),
-                              isActive: _addMemberStep >= 2,
-                              state: _addMemberStep > 2
-                                  ? StepState.complete
-                                  : StepState.indexed,
-                              content: Form(
-                                key: _formKey2,
-                                child: Column(
-                                  crossAxisAlignment: CrossAxisAlignment.start,
-                                  children: [
-                                    Row(
-                                      mainAxisAlignment:
-                                          MainAxisAlignment.spaceBetween,
-                                      children: [
-                                        const Text("Plan Details",
-                                            style: TextStyle(
-                                                fontWeight: FontWeight.bold,
-                                                color: Color(0xff13322b))),
-                                        TextButton.icon(
-                                          onPressed: () async {
-                                            final updated =
-                                                await _showPlanTypeManagerDialog(
-                                                    dialogContext);
-                                            if (updated) {
-                                              dialogSetState(() {});
-                                            }
-                                          },
-                                          icon: const Icon(Icons.tune,
-                                              size: 16,
-                                              color: Color(0xff13322b)),
-                                          label: const Text(
-                                              'Manage Plan Types',
-                                              style: TextStyle(
-                                                  color: Color(0xff13322b))),
-                                        ),
-                                      ],
-                                    ),
-                                    const SizedBox(height: 10),
-                                    Row(
-                                      children: [
-                                        Expanded(
-                                          child: CustomListDropdownFormField(
-                                            label: 'Select Member Type',
-                                            labelStyle: const TextStyle(
-                                                color: Color(0xff13322b)),
-                                            items: memberTypeItems,
-                                            controller: memberTypeController,
-                                            onChanged: (selectedItem) {},
-                                          ),
-                                        ),
-                                        const SizedBox(width: 8),
-                                        Expanded(
-                                          child: CustomListDropdownFormField(
-                                            label: 'Select Enrollment Type',
-                                            labelStyle: const TextStyle(
-                                                color: Color(0xff13322b)),
-                                            items: enrollmentTypeItems,
-                                            controller:
-                                                enrollmentTypeController,
-                                            onChanged: (selectedItem) {},
-                                          ),
-                                        ),
-                                        const SizedBox(width: 8),
-                                        Expanded(
-                                          child: CustomListDropdownFormField(
-                                            label: 'Select Plan Type',
-                                            labelStyle: const TextStyle(
-                                                color: Color(0xff13322b)),
-                                            items: _localPlanTypeItems,
-                                            controller: planTypeController,
-                                            onChanged: (selectedItem) {},
-                                          ),
-                                        ),
-                                      ],
-                                    ),
-                                    const SizedBox(height: 16),
-                                    Row(
-                                      children: [
-                                        Expanded(
-                                          child: CustomListDropdownFormField(
-                                            label:
-                                                'Select Room and Board Type',
-                                            labelStyle: const TextStyle(
-                                                color: Color(0xff13322b)),
-                                            items: roomBoardTypeItems,
-                                            controller:
-                                                roomAndBoardTypeController,
-                                            onChanged: (selectedItem) {},
-                                          ),
-                                        ),
-                                        const SizedBox(width: 8),
-                                        Expanded(
-                                          child: CustomTextFormField(
-                                            label: const Row(children: [
-                                              Text('Room and Board Limit',
-                                                  style: TextStyle(
-                                                      color: Colors.black)),
-                                              Text(' *',
-                                                  style: TextStyle(
-                                                      color: Colors.red)),
-                                            ]),
-                                            labelStyle: const TextStyle(
-                                                color: Color(0xff13322b),
-                                                fontSize: 14),
-                                            controller:
-                                                roomAndBoardLimitController,
-                                            isNumeric: true,
-                                            maxLength: 5,
-                                            validator: (value) {
-                                              if (value == null ||
-                                                  value.isEmpty) {
-                                                return 'Room and board limit required';
-                                              }
-                                              return null;
-                                            },
-                                          ),
-                                        ),
-                                      ],
-                                    ),
-                                    const SizedBox(height: 16),
-                                    Row(
-                                      children: [
-                                        Expanded(
-                                          child: CustomListDropdownFormField(
-                                            label:
-                                                'Select Room and Board Type',
-                                            labelStyle: const TextStyle(
-                                                color: Color(0xff13322b)),
-                                            items: benefitTypeItems,
-                                            controller:
-                                                benefitLimitTypeController,
-                                            onChanged: (selectedItem) {},
-                                          ),
-                                        ),
-                                        const SizedBox(width: 8),
-                                        Expanded(
-                                          child: CustomTextFormField(
-                                            label: const Row(children: [
-                                              Text('Benefit Limit',
-                                                  style: TextStyle(
-                                                      color: Colors.black)),
-                                              Text(' *',
-                                                  style: TextStyle(
-                                                      color: Colors.red)),
-                                            ]),
-                                            labelStyle: const TextStyle(
-                                                color: Color(0xff13322b),
-                                                fontSize: 14),
-                                            controller: benefitLimitController,
-                                            isNumeric: true,
-                                            maxLength: 6,
-                                            validator: (value) {
-                                              if (value == null ||
-                                                  value.isEmpty) {
-                                                return 'Benefit limit required';
-                                              }
-                                              return null;
-                                            },
-                                          ),
-                                        ),
-                                      ],
-                                    ),
-                                    const SizedBox(height: 20),
-                                    const Text("Card Details",
-                                        style: TextStyle(
-                                            fontWeight: FontWeight.bold,
-                                            color: Color(0xff13322b))),
-                                    const SizedBox(height: 10),
-                                    Row(
-                                      children: [
-                                        Expanded(
-                                          child: CustomTextFormField(
-                                            label: const Row(children: [
-                                              Text('Card Type',
-                                                  style: TextStyle(
-                                                      color: Colors.black)),
-                                              Text(' *',
-                                                  style: TextStyle(
-                                                      color: Colors.red)),
-                                            ]),
-                                            labelStyle: const TextStyle(
-                                                color: Color(0xff13322b),
-                                                fontSize: 14),
-                                            controller: cardTypeController,
-                                            isRead: false,
-                                            isNumeric: false,
-                                            validator: (value) => null,
-                                            maxLength: 16,
-                                          ),
-                                        ),
-                                        const SizedBox(width: 8),
-                                        Expanded(
-                                          child: CustomTextFormField(
-                                            label: const Row(children: [
-                                              Text('Card Number',
-                                                  style: TextStyle(
-                                                      color: Colors.black)),
-                                              Text(' *',
-                                                  style: TextStyle(
-                                                      color: Colors.red)),
-                                            ]),
-                                            labelStyle: const TextStyle(
-                                                color: Color(0xff13322b),
-                                                fontSize: 14),
-                                            controller: cardNumberController,
-                                            isNumeric: true,
-                                            validator: (value) {
-                                              if (value == null ||
-                                                  value.isEmpty) {
-                                                return 'Card number is required';
-                                              } else if (value.length != 16) {
-                                                return 'Card number should be 16 digit';
-                                              }
-                                              return null;
-                                            },
-                                            maxLength: 16,
-                                          ),
-                                        ),
-                                      ],
-                                    ),
-                                    const SizedBox(height: 10),
-                                    Row(
-                                      children: [
-                                        Expanded(
-                                          child: GestureDetector(
-                                            onTap: () async {
-                                              final picked =
-                                                  await showDatePicker(
-                                                context: dialogContext,
-                                                initialDate: ecardEffectiveController
-                                                        .text.isNotEmpty
-                                                    ? DateTime.tryParse(
-                                                        ecardEffectiveController
-                                                            .text)
-                                                    : DateTime.now(),
-                                                firstDate: DateTime(2020),
-                                                lastDate: DateTime(2040),
-                                                builder: (context, child) {
-                                                  return Theme(
-                                                    data: Theme.of(context)
-                                                        .copyWith(
-                                                      colorScheme:
-                                                          const ColorScheme
-                                                              .light(
-                                                              primary: Color(
-                                                                  0xff13322b)),
-                                                    ),
-                                                    child: child!,
-                                                  );
-                                                },
-                                              );
-                                              if (picked != null) {
-                                                dialogSetState(() {
-                                                  ecardEffectiveController
-                                                      .text = picked
-                                                      .toIso8601String()
-                                                      .split('T')[0];
-                                                });
-                                              }
-                                            },
-                                            child: AbsorbPointer(
-                                              child: CustomTextFormField(
-                                                label: const Row(children: [
-                                                  Text('Effective Date',
-                                                      style: TextStyle(
-                                                          color:
-                                                              Colors.black)),
-                                                  Text(' *',
-                                                      style: TextStyle(
-                                                          color: Colors.red)),
-                                                ]),
-                                                labelStyle: const TextStyle(
-                                                    color: Color(0xff13322b),
-                                                    fontSize: 14),
-                                                controller:
-                                                    ecardEffectiveController,
-                                                isNumeric: false,
-                                                validator: (value) {
-                                                  if (value == null ||
-                                                      value.isEmpty) {
-                                                    return 'Effective date is required';
-                                                  }
-                                                  return null;
-                                                },
-                                                maxLength: 10,
-                                              ),
-                                            ),
-                                          ),
-                                        ),
-                                        const SizedBox(width: 8),
-                                        Expanded(
-                                          child: GestureDetector(
-                                            onTap: () async {
-                                              final picked =
-                                                  await showDatePicker(
-                                                context: dialogContext,
-                                                initialDate: ecardExpiryController
-                                                        .text.isNotEmpty
-                                                    ? DateTime.tryParse(
-                                                        ecardExpiryController
-                                                            .text)
-                                                    : DateTime.now().add(
-                                                        const Duration(
-                                                            days: 365)),
-                                                firstDate: DateTime(2020),
-                                                lastDate: DateTime(2040),
-                                                builder: (context, child) {
-                                                  return Theme(
-                                                    data: Theme.of(context)
-                                                        .copyWith(
-                                                      colorScheme:
-                                                          const ColorScheme
-                                                              .light(
-                                                              primary: Color(
-                                                                  0xff13322b)),
-                                                    ),
-                                                    child: child!,
-                                                  );
-                                                },
-                                              );
-                                              if (picked != null) {
-                                                dialogSetState(() {
-                                                  ecardExpiryController
-                                                      .text = picked
-                                                      .toIso8601String()
-                                                      .split('T')[0];
-                                                });
-                                              }
-                                            },
-                                            child: AbsorbPointer(
-                                              child: CustomTextFormField(
-                                                label: const Row(children: [
-                                                  Text('Expiry Date',
-                                                      style: TextStyle(
-                                                          color:
-                                                              Colors.black)),
-                                                  Text(' *',
-                                                      style: TextStyle(
-                                                          color: Colors.red)),
-                                                ]),
-                                                labelStyle: const TextStyle(
-                                                    color: Color(0xff13322b),
-                                                    fontSize: 14),
-                                                controller:
-                                                    ecardExpiryController,
-                                                isNumeric: false,
-                                                validator: (value) {
-                                                  if (value == null ||
-                                                      value.isEmpty) {
-                                                    return 'Expiry date is required';
-                                                  }
-                                                  return null;
-                                                },
-                                                maxLength: 10,
-                                              ),
-                                            ),
-                                          ),
-                                        ),
-                                      ],
-                                    ),
-                                  ],
-                                ),
-                              ),
-                            ),
-
-                            // Step 4: Confirm
-                            Step(
-                              title: const Text('Confirm',
-                                  style: TextStyle(fontSize: 12)),
-                              isActive: _addMemberStep >= 3,
-                              state: StepState.indexed,
-                              content: isLoading
-                                  ? const SizedBox(
-                                      height: 300,
-                                      child: Center(
-                                        child: SpinKitCircle(
-                                          color: Color(0xff13322B),
-                                          size: 50.0,
-                                        ),
-                                      ),
-                                    )
-                                  : SingleChildScrollView(
-                                      child: Column(
-                                        crossAxisAlignment:
-                                            CrossAxisAlignment.start,
-                                        children: [
-                                          _buildConfirmSection(
-                                            'Name & Contact',
-                                            0,
-                                            dialogSetState,
-                                            [
-                                              _confirmRow(
-                                                  'First Name',
-                                                  fnameController.text
-                                                          .isEmpty
-                                                      ? '-'
-                                                      : fnameController.text),
-                                              _confirmRow(
-                                                  'Middle Name',
-                                                  mnameController.text
-                                                          .isEmpty
-                                                      ? '-'
-                                                      : mnameController.text),
-                                              _confirmRow(
-                                                  'Last Name',
-                                                  lnameController.text
-                                                          .isEmpty
-                                                      ? '-'
-                                                      : lnameController.text),
-                                              _confirmRow(
-                                                  'Contact No',
-                                                  contactNoController
-                                                          .text.isEmpty
-                                                      ? '-'
-                                                      : contactNoController
-                                                          .text),
-                                              _confirmRow(
-                                                  'Email',
-                                                  emailController
-                                                          .text.isEmpty
-                                                      ? '-'
-                                                      : emailController.text),
-                                            ],
-                                          ),
-                                          const SizedBox(height: 12),
-                                          _buildConfirmSection(
-                                            'Personal & Address',
-                                            1,
-                                            dialogSetState,
-                                            [
-                                              _confirmRow('Sex',
-                                                  _selectedSex ?? '-'),
-                                              _confirmRow(
-                                                  'Birthday',
-                                                  _birthday != null
-                                                      ? "${_birthday?.toLocal()}"
-                                                          .split(' ')[0]
-                                                      : '-'),
-                                              _confirmRow(
-                                                  'Civil Status',
-                                                  civilStatusController
-                                                          .text.isEmpty
-                                                      ? '-'
-                                                      : civilStatusController
-                                                          .text),
-                                              _confirmRow(
-                                                  'House Address',
-                                                  houseAddressController
-                                                          .text.isEmpty
-                                                      ? '-'
-                                                      : houseAddressController
-                                                          .text),
-                                              _confirmRow(
-                                                  'Region',
-                                                  regionController
-                                                          .text.isEmpty
-                                                      ? '-'
-                                                      : regionController.text),
-                                              _confirmRow(
-                                                  'Province',
-                                                  provinceController
-                                                          .text.isEmpty
-                                                      ? '-'
-                                                      : provinceController
-                                                          .text),
-                                              _confirmRow(
-                                                  'City',
-                                                  cityController.text.isEmpty
-                                                      ? '-'
-                                                      : cityController.text),
-                                              _confirmRow(
-                                                  'Barangay',
-                                                  barangayController
-                                                          .text.isEmpty
-                                                      ? '-'
-                                                      : barangayController
-                                                          .text),
-                                              _confirmRow(
-                                                  'Postal Code',
-                                                  postalCodeController
-                                                          .text.isEmpty
-                                                      ? '-'
-                                                      : postalCodeController
-                                                          .text),
-                                            ],
-                                          ),
-                                          const SizedBox(height: 12),
-                                          _buildConfirmSection(
-                                            'Plan & Card Details',
-                                            2,
-                                            dialogSetState,
-                                            [
-                                              _confirmRow(
-                                                  'Member Type',
-                                                  memberTypeController
-                                                          .text.isEmpty
-                                                      ? '-'
-                                                      : memberTypeController
-                                                          .text),
-                                              _confirmRow(
-                                                  'Enrollment Type',
-                                                  enrollmentTypeController
-                                                          .text.isEmpty
-                                                      ? '-'
-                                                      : enrollmentTypeController
-                                                          .text),
-                                              _confirmRow(
-                                                  'Plan Type',
-                                                  planTypeController
-                                                          .text.isEmpty
-                                                      ? '-'
-                                                      : planTypeController
-                                                          .text),
-                                              _confirmRow(
-                                                  'Room & Board Limit',
-                                                  roomAndBoardLimitController
-                                                          .text.isEmpty
-                                                      ? '-'
-                                                      : roomAndBoardLimitController
-                                                          .text),
-                                              _confirmRow(
-                                                  'Benefit Limit',
-                                                  benefitLimitController
-                                                          .text.isEmpty
-                                                      ? '-'
-                                                      : benefitLimitController
-                                                          .text),
-                                              _confirmRow(
-                                                  'Card Type',
-                                                  cardTypeController
-                                                          .text.isEmpty
-                                                      ? '-'
-                                                      : cardTypeController
-                                                          .text),
-                                              _confirmRow(
-                                                  'Card Number',
-                                                  cardNumberController
-                                                          .text.isEmpty
-                                                      ? '-'
-                                                      : cardNumberController
-                                                          .text),
-                                              _confirmRow(
-                                                  'Effective Date',
-                                                  ecardEffectiveController
-                                                          .text.isEmpty
-                                                      ? '-'
-                                                      : ecardEffectiveController
-                                                          .text),
-                                              _confirmRow(
-                                                  'Expiry Date',
-                                                  ecardExpiryController
-                                                          .text.isEmpty
-                                                      ? '-'
-                                                      : ecardExpiryController
-                                                          .text),
-                                            ],
-                                          ),
-                                        ],
-                                      ),
-                                    ),
-                            ),
-                          ],
-                        ),
+                      child: SingleChildScrollView(
+                        padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 8),
+                        child: _buildStepContent(dialogContext, dialogSetState),
                       ),
                     ),
+                    _buildDialogFooter(dialogContext, dialogSetState),
                   ],
                 ),
               ),

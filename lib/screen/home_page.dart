@@ -7,13 +7,13 @@ import 'dart:convert';
 import 'package:medicare_admin_remaster/bloc/auth/auth_bloc.dart';
 import 'package:medicare_admin_remaster/screen/login_page.dart';
 import 'package:medicare_admin_remaster/screen/subpages/admin_page.dart';
-//import 'package:medicare_admin_remaster/screen/subpages/data_analytics_page.dart';
 import 'package:medicare_admin_remaster/screen/subpages/doctor_management_page.dart';
 import 'package:medicare_admin_remaster/screen/subpages/health_card_page.dart';
 import 'package:medicare_admin_remaster/screen/subpages/loa_request_page.dart';
 import 'package:medicare_admin_remaster/screen/subpages/overview_page.dart';
 import 'package:medicare_admin_remaster/screen/subpages/pnp_page.dart';
 import 'package:medicare_admin_remaster/screen/subpages/user_management_page.dart';
+import 'package:medicare_admin_remaster/services/cache_service.dart';
 import 'package:medicare_admin_remaster/shared/api.dart';
 
 class HomePage extends StatefulWidget {
@@ -24,174 +24,171 @@ class HomePage extends StatefulWidget {
 }
 
 class _HomePageState extends State<HomePage> {
-  Widget currentPage = const OverviewPage(); // Default page
-  int selectedCardIndex = -1; // Track selected card index
-  List<bool> isHovered = List.generate(7, (_) => false);
-  int pendingCount = 0; // To hold the pending count
-  bool isLoading = true; // To manage loading state
+  int _selectedCardIndex = 0;
+  int _currentPageIndex = 0;
+  int _pendingCount = 0;
+  bool _isLoading = true;
   Timer? _timer;
+
+  late final List<Widget> _pages;
+
   @override
   void initState() {
     super.initState();
-    fetchPendingCount('pending'); // Fetch pending count on init
-    // Start a timer to refresh the pending count every 30 seconds
-    _timer = Timer.periodic(const Duration(seconds: 3), (timer) {
-      fetchPendingCount('pending');
+    _pages = const [
+      OverviewPage(),
+      HealthCardPage(),
+      LoaRequestPage(),
+      UserManagementPage(),
+      PnpPage(),
+      DoctorManagementPage(),
+      AdminPage(),
+    ];
+
+    CacheService.instance.initLoaRequests();
+    CacheService.instance.initMembers();
+
+    _fetchPendingCount('pending');
+    _timer = Timer.periodic(const Duration(seconds: 30), (_) {
+      _fetchPendingCount('pending');
     });
   }
 
-  Future<void> fetchPendingCount(String status) async {
+  @override
+  void dispose() {
+    _timer?.cancel();
+    super.dispose();
+  }
+
+  Future<void> _fetchPendingCount(String status) async {
     try {
       final response = await http.post(
-        Uri.parse('https://medicareplus-api.vercel.app/api/admin/count_status'),
-        headers: {
-          'Content-Type': 'application/json',
-          'supabase-url': supabaseUrl, // Add Supabase URL
-          'supabase-key': supabaseKey,
-        },
-        body: json.encode({
-          'status': status,
-        }),
+        Uri.parse(adminEndpoint('count_status')),
+        headers: buildApiHeaders(),
+        body: json.encode({'status': status}),
       );
 
       if (response.statusCode == 200) {
         final data = json.decode(response.body);
-        setState(() {
-          pendingCount = data['count'] ?? 0; // Update pending count
-          status = data['status'] ?? status; // Update status
-          isLoading = false; // Loading complete
-        });
-      } else {
-        throw Exception('Failed to load status count');
+        if (mounted) {
+          setState(() {
+            _pendingCount = data['count'] ?? 0;
+            _isLoading = false;
+          });
+        }
       }
     } catch (e) {
-      print('Error: $e'); // Log the error for debugging
+      if (mounted) {
+        setState(() {
+          _isLoading = false;
+        });
+      }
+    }
+  }
+
+  void _changePage(int pageIndex, String adminType) {
+    if (pageIndex == _currentPageIndex) return;
+
+    if (adminType == 'upd') {
+      if (pageIndex == 0) {
+        setState(() {
+          _currentPageIndex = 0;
+          _selectedCardIndex = 0;
+        });
+      } else if (pageIndex == 1) {
+        setState(() {
+          _currentPageIndex = 3;
+          _selectedCardIndex = 1;
+        });
+      }
+    } else if (adminType == 'claims' || adminType == 'concierge') {
+      if (pageIndex == 6) return;
       setState(() {
-        isLoading = false; // Loading complete even if there's an error
+        _currentPageIndex = pageIndex;
+        _selectedCardIndex = pageIndex;
+      });
+    } else {
+      setState(() {
+        _currentPageIndex = pageIndex;
+        _selectedCardIndex = pageIndex;
       });
     }
   }
-/*
-  void changePage(int pageIndex) {
-    setState(() {
-      selectedCardIndex = pageIndex; // Update selected index
-      switch (pageIndex) {
-        case 0:
-          currentPage = const OverviewPage();
-          break;
-        // case 1:
-        //   currentPage = const DataAnalyticsPage();
-        //   break;
-        case 1:
-          currentPage = const HealthCardPage();
-          break;
-        case 2:
-          currentPage = const LoaRequestPage();
-          break;
-        case 3:
-          currentPage = const UserManagementPage();
-          break;
-        case 4:
-          currentPage = const PnpPage();
-          break;
-        case 5:
-          currentPage = const DoctorManagementPage();
-          break;
-        case 6:
-          currentPage = const AdminPage();
-          break;
-      }
-    });
-  }*/
 
-  void changePage(int pageIndex, String adminType) {
-  setState(() {
-    selectedCardIndex = pageIndex; // Update selected index
+  int _getCardListLength(String adminType) {
+    if (adminType == 'upd') return 2;
+    if (adminType == 'claims' || adminType == 'concierge') return 6;
+    return 7;
+  }
 
-    // Restrict page navigation based on adminType
+  List<String> _getCardTitles(String adminType) {
     if (adminType == 'upd') {
-      // UPD can only access Overview, Health Card, and Customer (indices 0, 1, 2)
-      if (pageIndex == 0) {
-        currentPage = const OverviewPage();
-      } else if (pageIndex == 1) {
-        currentPage = const UserManagementPage();
-      } else {
-        // Prevent navigation to restricted pages for UPD admin
-        return;
-      }
-    } else if (adminType == 'claims' || adminType == 'concierge') {
-      // Claims can access all except Admin (index 6)
-      if (pageIndex == 0) {
-        currentPage = const OverviewPage();
-      } else if (pageIndex == 1) {
-        currentPage = const HealthCardPage();
-      } else if (pageIndex == 2) {
-        currentPage = const LoaRequestPage();
-      } else if (pageIndex == 3) {
-        currentPage = const UserManagementPage();
-      } else if (pageIndex == 4) {
-        currentPage = const PnpPage();
-      } else if (pageIndex == 5) {
-        currentPage = const DoctorManagementPage();
-      } else {
-        // Prevent navigation to Admin page for Claims admin
-        return;
-      }
+      return ['Overview', 'Members'];
+    } else if (adminType == 'claims') {
+      return [
+        'Overview',
+        'Health Card',
+        'LOA Requests',
+        'Members',
+        'PNP',
+        'Doctor',
+      ];
     } else {
-      // For other admins, allow all pages
-      switch (pageIndex) {
-        case 0:
-          currentPage = const OverviewPage();
-          break;
-        case 1:
-          currentPage = const HealthCardPage();
-          break;
-        case 2:
-          currentPage = const LoaRequestPage();
-          break;
-        case 3:
-          currentPage = const UserManagementPage();
-          break;
-        case 4:
-          currentPage = const PnpPage();
-          break;
-        case 5:
-          currentPage = const DoctorManagementPage();
-          break;
-        case 6:
-          currentPage = const AdminPage();
-          break;
-      }
-    }
-  });
-}
-
-
-  int getCardListLength(String adminType) {
-    if (adminType == 'upd') {
-      return 2;  // 'UPD' admin can see 3 cards
-    } else if (adminType == 'claims' || adminType == 'concierge') {
-      return 6;  // 'Claims' admin can see 6 cards
-    } else {
-      return 7;  // Default case, other admin types can see all 7 cards
+      return [
+        'Overview',
+        'Health Card',
+        'LOA Requests',
+        'Members',
+        'Analytics',
+        'Doctor',
+        'Admin',
+      ];
     }
   }
 
+  List<IconData> _getCardIcons(String adminType) {
+    if (adminType == 'upd') {
+      return [Icons.dashboard_outlined, Icons.people_outline];
+    } else if (adminType == 'claims') {
+      return [
+        Icons.dashboard_outlined,
+        Icons.credit_card_outlined,
+        Icons.description_outlined,
+        Icons.people_outline,
+        Icons.local_hospital_outlined,
+        Icons.person_outline,
+      ];
+    } else {
+      return [
+        Icons.dashboard_outlined,
+        Icons.credit_card_outlined,
+        Icons.description_outlined,
+        Icons.people_outline,
+        Icons.analytics_outlined,
+        Icons.person_outline,
+        Icons.admin_panel_settings_outlined,
+      ];
+    }
+  }
+
+  int _sidebarIndexToPage(int sidebarIndex, String adminType) {
+    if (adminType == 'upd') {
+      return sidebarIndex == 0 ? 0 : 3;
+    }
+    return sidebarIndex;
+  }
 
   @override
   Widget build(BuildContext context) {
-    double height = MediaQuery.of(context).size.height;
-    double width = MediaQuery.of(context).size.width;
     return Scaffold(
-      backgroundColor: Colors.white,
+      backgroundColor: const Color(0xFFF8F9FF),
       body: BlocConsumer<AuthBloc, AuthState>(
         listener: (context, state) {
           if (state is AuthInitial) {
+            CacheService.instance.reset();
             Navigator.pushAndRemoveUntil(
               context,
-              MaterialPageRoute(
-                builder: (context) => const LoginScreen(),
-              ),
+              MaterialPageRoute(builder: (context) => const LoginScreen()),
               (route) => false,
             );
           }
@@ -199,305 +196,237 @@ class _HomePageState extends State<HomePage> {
         builder: (context, authState) {
           if (authState is AuthLoading) {
             return const Center(
-              child: CircularProgressIndicator(
-                color: Colors.red,
-              ),
+              child: CircularProgressIndicator(color: Color(0xFF00455D)),
             );
           } else if (authState is AuthSuccess) {
-            return Row(children: [
-              Padding(
-                padding: const EdgeInsets.only(left: 10, right: 5),
-                child: SizedBox(
-                  width: width * .18,
+            final adminType = authState.adminType.toString();
+            final cardTitles = _getCardTitles(adminType);
+            final cardCount = _getCardListLength(adminType);
+            final cardIcons = _getCardIcons(adminType);
+
+            return Row(
+              children: [
+                // Sidebar
+                Container(
+                  width: 260,
+                  decoration: BoxDecoration(
+                    color: Colors.white,
+                    border: Border(
+                      right: BorderSide(color: Colors.grey.shade200, width: 1),
+                    ),
+                  ),
                   child: Column(
                     children: [
-                      // Image and dashboard title
-                      Expanded(
-                        flex: 10,
-                        child: Container(
-                          decoration: BoxDecoration(
-                            color: Colors.white,
-                            border: Border.all(color: Colors.white),
-                          ),
-                          child: Center(
-                            child: Image.asset(
-                              'assets/Medicare.png',
-                              height: 200,
-                            ),
-                          ),
-                        ),
-                      ),
-                      // Dashboard title
-                      Expanded(
-                        flex: 5,
-                        child: Container(
-                          decoration: BoxDecoration(
-                            color: Colors.white,
-                            border: Border.all(color: Colors.white),
-                          ),
-                          child: const Align(
-                            alignment: Alignment.centerLeft,
-                            child: Padding(
-                              padding: EdgeInsets.only(left: 16.0),
-                              child: Text(
-                                'DASHBOARD',
-                                style: TextStyle(
-                                  fontSize: 14,
-                                  fontFamily: "Roboto-L",
-                                  color: Color(0XFF13322B),
-                                ),
-                              ),
-                            ),
-                          ),
-                        ),
-                      ),
-                      // Cards
-                      Expanded(
-                        flex: 70,
+                      // Logo Section
+                      Padding(
+                        padding: const EdgeInsets.fromLTRB(24, 28, 24, 8),
                         child: Column(
-                          children: List.generate(getCardListLength(authState.adminType.toString()), (index) {
-                            List<String> cardTitles;
-                            if (authState.adminType.toString() == 'upd') {
-                              // UPD admin type can only see these titles
-                              cardTitles = [
-                                'Overview',
-                                'Customer',
-                              ];
-                            } else if (authState.adminType.toString() == 'claims') {
-                              // Claims admin type can see everything except Admin
-                              cardTitles = [
-                                'Overview',
-                                'Health Card',
-                                'LOA Requests ${isLoading ? '' : '($pendingCount)'}',
-                                'Customer',
-                                'PNP',
-                                'Doctor',
-                              ];
-                            } else {
-                              // Other admins have access to all titles
-                              cardTitles = [
-                                'Overview',
-                                'Health Card',
-                                'LOA Requests ${isLoading ? '' : '($pendingCount)'}',
-                                'Customer',
-                                'PNP',
-                                'Doctor',
-                                'Admin',
-                              ];
-                            }
-
-                            return MouseRegion(
-                              onEnter: (_) {
-                                setState(() {
-                                  isHovered[index] = true;
-                                });
-                              },
-                              onExit: (_) {
-                                setState(() {
-                                  isHovered[index] = false;
-                                });
-                              },
-                              child: GestureDetector(
-                                onTap: () => changePage(index,authState.adminType.toString()),
-                                child: Padding(
-                                  padding: const EdgeInsets.all(10.0),
-                                  child: Stack(
-                                    children: [
-                                      Container(
-                                        height: 80,
-                                        padding: const EdgeInsets.symmetric(
-                                            horizontal: 20),
-                                        decoration: BoxDecoration(
-                                          color: Colors.white,
-                                          borderRadius:
-                                              BorderRadius.circular(10),
-                                          border: Border.all(
-                                            color: selectedCardIndex == index
-                                                ? const Color(0xFF13322B)
-                                                : (isHovered[index]
-                                                    ? Colors.grey
-                                                    : Colors.transparent),
-                                            width: 1.0,
-                                          ),
-                                        ),
-                                        child: Align(
-                                          alignment: Alignment.centerLeft,
-                                          child: Text(
-                                            cardTitles[index],
-                                            style: const TextStyle(
-                                              color: Color(0XFF13322B),
-                                              fontSize: 20,
-                                              fontFamily: "Roboto-M",
-                                            ),
-                                          ),
-                                        ),
-                                      ),
-                                      // Vertical line on the right edge of the card
-                                      Positioned(
-                                        right: 0,
-                                        top: 0,
-                                        bottom: 0,
-                                        child: Container(
-                                          width: 40,
-                                          decoration: BoxDecoration(
-                                            color: (selectedCardIndex == index)
-                                                ? const Color(0xFF13322B)
-                                                : (isHovered[index]
-                                                    ? Colors.grey
-                                                    : Colors.transparent),
-                                            borderRadius:
-                                                const BorderRadius.only(
-                                              topRight: Radius.circular(10),
-                                              bottomRight: Radius.circular(10),
-                                            ),
-                                          ),
-                                        ),
-                                      ),
-                                    ],
-                                  ),
-                                ),
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Image.asset(
+                              'assets/Medicare.png',
+                              height: 36,
+                            ),
+                            const SizedBox(height: 6),
+                            Text(
+                              'ADMIN PORTAL',
+                              style: TextStyle(
+                                fontSize: 11,
+                                fontWeight: FontWeight.w700,
+                                color: const Color(0xFF00455D),
+                                letterSpacing: 1.5,
                               ),
-                            );
-                          }),
+                            ),
+                          ],
                         ),
                       ),
-                      // Logout button
-                      Container(
-                        height: height * .05,
-                        decoration: BoxDecoration(
-                          color: Colors.white,
-                          border: Border.all(color: Colors.white),
-                          borderRadius: BorderRadius.circular(10),
-                        ),
-                        child: Center(
-                          child: SizedBox(
-                            height: 40,
-                            width: 300,
-                            child: ElevatedButton(
-                              style: ElevatedButton.styleFrom(
-                                backgroundColor: const Color(0xff13322B),
-                                shape: RoundedRectangleBorder(
-                                  borderRadius: BorderRadius.circular(10),
-                                ),
-                              ),
-                              onPressed: () async {
-                                bool? confirmLogout = await showDialog<bool>(
-                                  context: context,
-                                  builder: (BuildContext context) {
-                                    return AlertDialog(
-                                          backgroundColor: Colors.white,
-                                          shape: RoundedRectangleBorder(
-                                              borderRadius: BorderRadius.circular(20.0),
-                                              side: const BorderSide(color: Color(0xff13322b), width: 2)),
-                                          title: const Center(
-                                              child: Text(
-                                            'Confirm Logout',
-                                            style: TextStyle(
-                                                fontSize: 16,
-                                                fontWeight: FontWeight.w700,
-                                                color: Color(0xff13322b)),
-                                          )),
-                                          content: const Text('Are you sure you want to logout?',
-                                              style: TextStyle(fontSize: 16, color: Color(0xff13322b))),
-                                          actions: <Widget>[
-                                            Row(
-                                              mainAxisAlignment: MainAxisAlignment.center,
-                                              children: [
-                                                SizedBox(
-                                              width:
-                                                  100, // Same width for the Select Files button
-                                              height:
-                                                  35, // Same height for the Select Files button
-                                              child: ElevatedButton(
-                                                onPressed: () =>
-                                                    Navigator.of(context)
-                                                        .pop(false),
-                                                style: ElevatedButton.styleFrom(
-                                                  shape: RoundedRectangleBorder(
-                                                    borderRadius:
-                                                        BorderRadius.circular(
-                                                            5),
-                                                    side: const BorderSide(
-                                                        color: Color(
-                                                            0xff13322b)), // Set the border color
-                                                  ),
-                                                  backgroundColor: Colors
-                                                      .white, // Set button background color to white
-                                                ),
-                                                child: const Text(
-                                                  'Cancel',
-                                                  style: TextStyle(
-                                                      color: Colors
-                                                          .black), // Set button text color to black for visibility
-                                                ),
-                                              ),
-                                            ),
-                                            const SizedBox(width: 5),
-                                            SizedBox(
-                                              width:
-                                                  100, // Same width for the Select Files button
-                                              height:
-                                                  35, // Same height for the Select Files button
-                                              child: ElevatedButton(
-                                                onPressed: () =>
-                                                    Navigator.of(context)
-                                                        .pop(true),
-                                                style: ElevatedButton.styleFrom(
-                                                  shape: RoundedRectangleBorder(
-                                                    borderRadius:
-                                                        BorderRadius.circular(
-                                                            5),
-                                                    side: const BorderSide(
-                                                        color: Color(
-                                                            0xff13322b)), // Set the border color
-                                                  ),
-                                                  backgroundColor: const Color(
-                                                      0xff13322b), // Set button background color to white
-                                                ),
-                                                child: const Text(
-                                                  'Logout',
-                                                  style: TextStyle(
-                                                      color: Color(
-                                                          0xffffffff)), // Set button text color to black for visibility
-                                                ),
-                                              ),
-                                            ),
-                                              ],
-                                            ),
-                                        
-                                          ],
-                                        );
-                                  
-                                  },
-                                );
+                      const SizedBox(height: 16),
 
-                                if (confirmLogout == true) {
-                                  context
-                                      .read<AuthBloc>()
-                                      .add(AuthLogoutRequested());
-                                }
-                              },
-                              child: const Text('Logout',
-                                  style: TextStyle(
-                                      fontSize: 14, color: Color(0xFFFFFFFF))),
+                      // Section Label
+                      const Padding(
+                        padding: EdgeInsets.symmetric(horizontal: 24),
+                        child: Align(
+                          alignment: Alignment.centerLeft,
+                          child: Text(
+                            'DASHBOARD',
+                            style: TextStyle(
+                              fontSize: 10,
+                              fontWeight: FontWeight.w700,
+                              color: Color(0xFF70787E),
+                              letterSpacing: 1.2,
                             ),
                           ),
+                        ),
+                      ),
+                      const SizedBox(height: 12),
+
+                      // Navigation Items
+                      Expanded(
+                        child: ListView.builder(
+                          padding: const EdgeInsets.symmetric(horizontal: 12),
+                          itemCount: cardCount,
+                          itemBuilder: (context, index) {
+                            final isSelected = _selectedCardIndex == index;
+                            return _buildNavItem(
+                              title: cardTitles[index],
+                              icon: cardIcons[index],
+                              isSelected: isSelected,
+                              onTap: () => _changePage(index, adminType),
+                              badge: index == 2 && !_isLoading && _pendingCount > 0
+                                  ? _pendingCount.toString()
+                                  : null,
+                            );
+                          },
+                        ),
+                      ),
+
+                      // Bottom Section: Help + Logout
+                      Padding(
+                        padding: const EdgeInsets.all(12),
+                        child: Column(
+                          children: [
+                            _buildNavItem(
+                              title: 'Help',
+                              icon: Icons.help_outline,
+                              isSelected: false,
+                              onTap: () {},
+                            ),
+                            const SizedBox(height: 4),
+                            _buildNavItem(
+                              title: 'Logout',
+                              icon: Icons.logout,
+                              isSelected: false,
+                              isDestructive: true,
+                              onTap: () => _handleLogout(context),
+                            ),
+                          ],
                         ),
                       ),
                     ],
                   ),
                 ),
-              ),
-              // Right side content
-              Expanded(
-                flex: 6,
-                child: currentPage,
-              ),
-            ]);
+
+                // Main Content
+                Expanded(
+                  child: IndexedStack(
+                    index: _currentPageIndex,
+                    children: _pages,
+                  ),
+                ),
+              ],
+            );
           }
-          return Container(); // Fallback if no auth state is found
+          return Container();
         },
       ),
     );
+  }
+
+  Widget _buildNavItem({
+    required String title,
+    required IconData icon,
+    required bool isSelected,
+    required VoidCallback onTap,
+    String? badge,
+    bool isDestructive = false,
+  }) {
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 2),
+      child: Material(
+        color: Colors.transparent,
+        child: InkWell(
+          onTap: onTap,
+          borderRadius: BorderRadius.circular(10),
+          child: AnimatedContainer(
+            duration: const Duration(milliseconds: 200),
+            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+            decoration: BoxDecoration(
+              color: isSelected
+                  ? const Color(0xFFE8F5F0)
+                  : Colors.transparent,
+              borderRadius: BorderRadius.circular(10),
+              border: isSelected
+                  ? Border.all(color: const Color(0xFF00455D).withOpacity(0.15), width: 1)
+                  : null,
+            ),
+            child: Row(
+              children: [
+                Icon(
+                  icon,
+                  size: 20,
+                  color: isDestructive
+                      ? Colors.red.shade400
+                      : isSelected
+                          ? const Color(0xFF00455D)
+                          : const Color(0xFF70787E),
+                ),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: Text(
+                    title,
+                    style: TextStyle(
+                      fontSize: 14,
+                      fontWeight: isSelected ? FontWeight.w600 : FontWeight.w500,
+                      color: isDestructive
+                          ? Colors.red.shade400
+                          : isSelected
+                              ? const Color(0xFF00455D)
+                              : const Color(0xFF40484D),
+                    ),
+                  ),
+                ),
+                if (badge != null)
+                  Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+                    decoration: BoxDecoration(
+                      color: Colors.orange.shade50,
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                    child: Text(
+                      badge,
+                      style: TextStyle(
+                        fontSize: 11,
+                        fontWeight: FontWeight.w700,
+                        color: Colors.orange.shade700,
+                      ),
+                    ),
+                  ),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+
+  Future<void> _handleLogout(BuildContext context) async {
+    final confirm = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        backgroundColor: Colors.white,
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(16),
+        ),
+        title: const Text('Confirm Logout',
+            style: TextStyle(
+                fontSize: 16, fontWeight: FontWeight.w700, color: Color(0xFF0B1C30))),
+        content: const Text('Are you sure you want to logout?',
+            style: TextStyle(fontSize: 14, color: Color(0xFF40484D))),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx, false),
+            child: const Text('Cancel', style: TextStyle(color: Color(0xFF70787E))),
+          ),
+          TextButton(
+            onPressed: () => Navigator.pop(ctx, true),
+            child: const Text('Logout', style: TextStyle(color: Colors.red)),
+          ),
+        ],
+      ),
+    );
+
+    if (confirm == true) {
+      context.read<AuthBloc>().add(AuthLogoutRequested());
+    }
   }
 }

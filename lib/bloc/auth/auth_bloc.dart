@@ -16,15 +16,38 @@ class AuthBloc extends Bloc<AuthEvent, AuthState> {
   }
 
   Future<http.Response> _login(String email, String password) {
-    String url = 'https://medicareplus-api.vercel.app/api/admin/admin_login';
+    final url = adminEndpoint('admin_login');
     return http.post(
       Uri.parse(url),
-      headers: {
-        'Content-Type': 'application/json',
-        'supabase-url': supabaseUrl, // Add Supabase URL
-        'supabase-key': supabaseKey, // Add Supabase Key
-      },
+      headers: buildApiHeaders(),
       body: json.encode({'email': email, 'password': password}),
+    );
+  }
+
+  Future<void> _saveSession(Map<String, dynamic> user) async {
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setInt('uid', user['admin_id'] as int);
+    await prefs.setString('adminType', user['admin_type'] as String);
+    await prefs.setString('firstName', user['first_name'] as String);
+    await prefs.setString('middleName', user['middle_name'] as String);
+    await prefs.setString('lastName', user['last_name'] as String);
+    await prefs.setString('email', user['email_address'] as String);
+    await prefs.setString('department', user['department'] as String);
+    await prefs.setInt('departmentId', user['department_id'] as int);
+    await prefs.setString('status', user['status'] as String);
+  }
+
+  AuthSuccess _toAuthSuccess(Map<String, dynamic> user) {
+    return AuthSuccess(
+      uid: user['admin_id'] as int,
+      adminType: user['admin_type'] as String,
+      firstName: user['first_name'] as String,
+      middleName: user['middle_name'] as String,
+      lastName: user['last_name'] as String,
+      email: user['email_address'] as String,
+      department: user['department'] as String,
+      departmentId: user['department_id'] as int,
+      status: user['status'] as String,
     );
   }
 
@@ -82,11 +105,37 @@ class AuthBloc extends Bloc<AuthEvent, AuthState> {
       // Email validation using regex
       if (!RegExp(r'^.+@[a-zA-Z]+\.{1}[a-zA-Z]+(\.{0,1}[a-zA-Z]+)$')
           .hasMatch(email)) {
-        emit(AuthFailure('Incorrect email or password, or account inactive. Please try again or contact support.'));
+        emit(AuthFailure(
+            'Incorrect email or password, or account inactive. Please try again or contact support.'));
         return;
       }
       if (password.length < 6) {
         emit(AuthFailure('Password cannot be less than 6 characters'));
+        return;
+      }
+
+      if (appEnv == 'local' && enableLocalAuthMock) {
+        final isValidLocalCredential =
+            email.toLowerCase() == localTestAdminEmail.toLowerCase() &&
+                password == localTestAdminPassword;
+        if (!isValidLocalCredential) {
+          emit(AuthFailure('Invalid local test credentials.'));
+          return;
+        }
+
+        final localUser = <String, dynamic>{
+          'admin_id': 999001,
+          'admin_type': 'admin',
+          'first_name': 'Local',
+          'middle_name': 'Test',
+          'last_name': 'Admin',
+          'email_address': localTestAdminEmail,
+          'department': 'Engineering',
+          'department_id': localTestAdminDepartmentId,
+          'status': 'active',
+        };
+        await _saveSession(localUser);
+        emit(_toAuthSuccess(localUser));
         return;
       }
 
@@ -97,32 +146,9 @@ class AuthBloc extends Bloc<AuthEvent, AuthState> {
         if (data['message'] == "Login successful") {
           final user = data['user'];
 
-          // Save session in SharedPreferences
-          final prefs = await SharedPreferences.getInstance();
-          await prefs.setInt('uid', user['admin_id']);
-          await prefs.setString('adminType', user['admin_type']);
-          await prefs.setString('firstName', user['first_name']);
-          await prefs.setString('middleName', user['first_name']);
-          await prefs.setString('lastName', user['last_name']);
-          await prefs.setString('email', user['email_address']);
-          await prefs.setString('department', user['department']);
-          await prefs.setInt('departmentId', user['department_id']);
-          await prefs.setString('status', user['status']);
-
-          // Emit success state with user data
-
+          await _saveSession(user);
           print("ADMINTYPE: ${user['admin_type']}");
-          emit(AuthSuccess(
-            uid: user['admin_id'],
-            adminType: user['admin_type'],
-            firstName: user['first_name'],
-            middleName: user['middle_name'],
-            lastName: user['last_name'],
-            email: user['email_address'],
-            department: user['department'],
-            departmentId: user['department_id'],
-            status: user['status']
-          ));
+          emit(_toAuthSuccess(user));
         } else {
           emit(AuthFailure('Login failed'));
         }

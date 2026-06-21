@@ -10,6 +10,7 @@ import 'package:intl/intl.dart';
 import 'package:medicare_admin_remaster/bloc/auth/auth_bloc.dart';
 import 'package:medicare_admin_remaster/class/loa_request.dart';
 import 'package:medicare_admin_remaster/screen/login_page.dart';
+import 'package:medicare_admin_remaster/services/cache_service.dart';
 import 'package:medicare_admin_remaster/shared/api.dart';
 import 'dart:typed_data';
 import 'dart:html' as html;
@@ -40,28 +41,30 @@ class _LoaRequestPageState extends State<LoaRequestPage> {
   List<PlatformFile>? _selectedFiles;
   bool showPendingOnly = false; // State variable to track filter status
   int activeButtonIndex = -1; // Initialize to -1 for no active button1
-  late ApiService _apiService;
   String statusFilter = '';
   String message = '';
   String searchQuery = '';
-  String filterCriteria='';
-  String formattedDate='';
+  String filterCriteria = '';
+  String formattedDate = '';
   final TextEditingController searchController = TextEditingController();
 
   @override
   void initState() {
     super.initState();
-    _apiService = ApiService('https://medicareplus-api.vercel.app'); // Replace with your actual API URL1
-    _members = _apiService.streamAllRequest(supabaseUrl, supabaseKey);
-    // Initialize the service with your endpoint
+    _members = CacheService.instance.loaRequestsStream;
+    // Seed with cached data if available
+    final cached = CacheService.instance.currentLoaRequests;
+    if (cached.isNotEmpty) {
+      requests = cached;
+      filteredRequest = requests;
+      countStatuses(requests);
+    }
   }
 
   @override
   void dispose() {
-    supabase.Supabase.instance.client.removeAllChannels();
     super.dispose();
   }
-
 
   void filterByStatus(String status) {
     setState(() {
@@ -74,23 +77,18 @@ class _LoaRequestPageState extends State<LoaRequestPage> {
     return formatter.format(date);
   }
 
-
   Future<void> logUserAction(
-   String userId,
-   String tableName,
-   String actionType,
-   String actionDetails,
+    String userId,
+    String tableName,
+    String actionType,
+    String actionDetails,
   ) async {
-    final uri = Uri.parse('https://medicareplus-api.vercel.app/api/admin/record_action');
+    final uri = Uri.parse(adminEndpoint('record_action'));
 
     try {
       final response = await http.post(
         uri,
-        headers: {
-          'Content-Type': 'application/json',
-          'supabase-url': supabaseUrl,
-          'supabase-key': supabaseKey,
-        },
+        headers: buildApiHeaders(),
         body: jsonEncode({
           'user_id': userId,
           'table_name': tableName,
@@ -116,7 +114,7 @@ class _LoaRequestPageState extends State<LoaRequestPage> {
     pendingCount = 0;
     approvedCount = 0;
     rejectCount = 0;
-    cancelledCount=0;
+    cancelledCount = 0;
     // Count statuses
     for (var member in members) {
       switch (member['status']) {
@@ -182,115 +180,103 @@ class _LoaRequestPageState extends State<LoaRequestPage> {
   }
 }*/
 
-Future<void> _pickFiles(StateSetter setState) async {
-  try {
-    final result = await FilePicker.platform.pickFiles(
-      allowMultiple: true,
-      type: FileType.custom,
-      allowedExtensions: ['pdf'], // Allow only PDF files
-    );
-    if (result != null && result.files.isNotEmpty) {
-      setState(() {
-        _selectedFiles = result.files; // Assign selected files
-      });
-    } else {
-      setState(() {
-        _selectedFiles = null; // Allow _selectedFiles to be empty
-      });
+  Future<void> _pickFiles(StateSetter setState) async {
+    try {
+      final result = await FilePicker.platform.pickFiles(
+        allowMultiple: true,
+        type: FileType.custom,
+        allowedExtensions: ['pdf'], // Allow only PDF files
+      );
+      if (result != null && result.files.isNotEmpty) {
+        setState(() {
+          _selectedFiles = result.files; // Assign selected files
+        });
+      } else {
+        setState(() {
+          _selectedFiles = null; // Allow _selectedFiles to be empty
+        });
+      }
+    } catch (e) {
+      print('Error picking files: $e');
     }
-  } catch (e) {
-    print('Error picking files: $e');
   }
-}
-
 
   Future<String> _lockedRequest(String lockedBy, String requestId) async {
-  String url = '$apiUrl/locked_request_form';
+    String url = '$apiUrl/locked_request_form';
 
-  final Map<String, dynamic> data = {
-    'locked_by': lockedBy,
-    'request_id': requestId,
-  };
+    final Map<String, dynamic> data = {
+      'locked_by': lockedBy,
+      'request_id': requestId,
+    };
 
-  try {
-    final response = await http.post(
-      Uri.parse(url),
-      headers: {
-        'Content-Type': 'application/json',
-        'supabase-url': supabaseUrl,
-        'supabase-key': supabaseKey,
-      },
-      body: json.encode(data),
-    );
+    try {
+      final response = await http.post(
+        Uri.parse(url),
+        headers: buildApiHeaders(),
+        body: json.encode(data),
+      );
 
-    if (response.statusCode == 200) {
-      await logUserAction(lockedBy,'mp_form_request_table','Update','Locked application # $requestId');
-      final responseData = json.decode(response.body);
-      print('Request is locked: ${responseData['message']}');
-      
-      // Access the locked_by value returned from the server
-      String lockedByValue = responseData['locked_by'].toString();
-      print('locked_by value: $lockedByValue');
-      
-      // Return the locked_by value
-      return lockedByValue;
-    } else {
-      await logUserAction(lockedBy,'mp_form_request_table','Update','Error on locking application # $requestId');
-      final errorData = json.decode(response.body);
-      print('Error: ${errorData['error']}');
-      // Return an error message or some default value
-      return 'Error: ${errorData['error']}';
+      if (response.statusCode == 200) {
+        await logUserAction(lockedBy, 'mp_form_request_table', 'Update',
+            'Locked application # $requestId');
+        final responseData = json.decode(response.body);
+        print('Request is locked: ${responseData['message']}');
+
+        // Access the locked_by value returned from the server
+        String lockedByValue = responseData['locked_by'].toString();
+        print('locked_by value: $lockedByValue');
+
+        // Return the locked_by value
+        return lockedByValue;
+      } else {
+        await logUserAction(lockedBy, 'mp_form_request_table', 'Update',
+            'Error on locking application # $requestId');
+        final errorData = json.decode(response.body);
+        print('Error: ${errorData['error']}');
+        // Return an error message or some default value
+        return 'Error: ${errorData['error']}';
+      }
+    } catch (error) {
+      print('Unexpected error: $error');
+      // Return a default error message
+      return 'Unexpected error occurred';
     }
-  } catch (error) {
-    print('Unexpected error: $error');
-    // Return a default error message
-    return 'Unexpected error occurred';
   }
-}
 
+  Future<String> _getName(String lockedBy) async {
+    String url = '$apiUrl/get_name';
 
+    final Map<String, dynamic> data = {'locked_by': lockedBy};
 
-Future<String> _getName(String lockedBy) async {
-  String url = '$apiUrl/get_name';
+    try {
+      final response = await http.post(
+        Uri.parse(url),
+        headers: buildApiHeaders(),
+        body: json.encode(data),
+      );
 
-  final Map<String, dynamic> data = {
-    'locked_by': lockedBy
-  };
+      if (response.statusCode == 200) {
+        final responseData = json.decode(response.body);
+        print('Request is locked: ${responseData['message']}');
 
-  try {
-    final response = await http.post(
-      Uri.parse(url),
-      headers: {
-        'Content-Type': 'application/json',
-        'supabase-url': supabaseUrl,
-        'supabase-key': supabaseKey,
-      },
-      body: json.encode(data),
-    );
+        // Access the locked_by value returned from the server
+        String lockedByValue = responseData['locked_by'].toString();
+        print('locked_by value: $lockedByValue');
 
-    if (response.statusCode == 200) {
-      final responseData = json.decode(response.body);
-      print('Request is locked: ${responseData['message']}');
-      
-      // Access the locked_by value returned from the server
-      String lockedByValue = responseData['locked_by'].toString();
-      print('locked_by value: $lockedByValue');
-      
-      // Return the locked_by value
-      return lockedByValue;
-    } else {
-      final errorData = json.decode(response.body);
-      print('Error: ${errorData['error']}');
-      // Return an error message or some default value
-      return 'Error: ${errorData['error']}';
+        // Return the locked_by value
+        return lockedByValue;
+      } else {
+        final errorData = json.decode(response.body);
+        print('Error: ${errorData['error']}');
+        // Return an error message or some default value
+        return 'Error: ${errorData['error']}';
+      }
+    } catch (error) {
+      print('Unexpected error: $error');
+      // Return a default error message
+      return 'Unexpected error occurred';
     }
-  } catch (error) {
-    print('Unexpected error: $error');
-    // Return a default error message
-    return 'Unexpected error occurred';
   }
-}
-
 
 /*Future<void> _releasedRequest(String lockedBy, String requestId) async {
   String url = '$apiUrl/released_request_form';
@@ -303,11 +289,7 @@ Future<String> _getName(String lockedBy) async {
   try {
     final response = await http.post(
       Uri.parse(url),
-      headers: {
-        'Content-Type': 'application/json',
-        'supabase-url': supabaseUrl,
-        'supabase-key': supabaseKey,
-      },
+      headers: buildApiHeaders(),
       body: json.encode(data),
     );
 
@@ -324,50 +306,45 @@ Future<String> _getName(String lockedBy) async {
   }
 }*/
 
-Future<bool> _releasedRequest(String lockedBy, String requestId) async {
-  String url = '$apiUrl/released_request_form';
+  Future<bool> _releasedRequest(String lockedBy, String requestId) async {
+    String url = '$apiUrl/released_request_form';
 
-  final Map<String, dynamic> data = {
-    'locked_by': lockedBy,
-    'request_id': requestId,
-  };
+    final Map<String, dynamic> data = {
+      'locked_by': lockedBy,
+      'request_id': requestId,
+    };
 
-  try {
-    final response = await http.post(
-      Uri.parse(url),
-      headers: {
-        'Content-Type': 'application/json',
-        'supabase-url': supabaseUrl,
-        'supabase-key': supabaseKey,
-      },
-      body: json.encode(data),
-    );
+    try {
+      final response = await http.post(
+        Uri.parse(url),
+        headers: buildApiHeaders(),
+        body: json.encode(data),
+      );
 
-    if (response.statusCode == 200) {
-      await logUserAction(lockedBy,'mp_form_request_table','Update','Released application # $requestId');
-      final responseData = json.decode(response.body);
-      print('Request is locked: ${responseData['message']}');
-      return true;  // Request processed successfully
-    } else {
-      await logUserAction(lockedBy,'mp_form_request_table','Update','Error on releasing application # $requestId');
-      final errorData = json.decode(response.body);
-      print('Error: ${errorData['error']}');
-      return false;  // Error processing the request
+      if (response.statusCode == 200) {
+        await logUserAction(lockedBy, 'mp_form_request_table', 'Update',
+            'Released application # $requestId');
+        final responseData = json.decode(response.body);
+        print('Request is locked: ${responseData['message']}');
+        return true; // Request processed successfully
+      } else {
+        await logUserAction(lockedBy, 'mp_form_request_table', 'Update',
+            'Error on releasing application # $requestId');
+        final errorData = json.decode(response.body);
+        print('Error: ${errorData['error']}');
+        return false; // Error processing the request
+      }
+    } catch (error) {
+      print('Unexpected error: $error');
+      return false; // Error occurred during the request
     }
-  } catch (error) {
-    print('Unexpected error: $error');
-    return false;  // Error occurred during the request
   }
-}
-
-
-
 
   Future<bool> _updateRequestForm(String requestId, String status, String name,
       String userId, String bucketName, String rejectReason) async {
     try {
       final dio = Dio();
-      
+
       // Prepare FormData for multipart request
       final formData = FormData.fromMap({
         'request_id': requestId,
@@ -380,7 +357,9 @@ Future<bool> _releasedRequest(String lockedBy, String requestId) async {
       });
 
       // Add files if bucket name is provided and files are selected
-      if (bucketName.isNotEmpty && _selectedFiles != null && _selectedFiles!.isNotEmpty) {
+      if (bucketName.isNotEmpty &&
+          _selectedFiles != null &&
+          _selectedFiles!.isNotEmpty) {
         for (var file in _selectedFiles!) {
           // Use file bytes directly - PlatformFile already has bytes available
           if (file.bytes != null) {
@@ -397,13 +376,10 @@ Future<bool> _releasedRequest(String lockedBy, String requestId) async {
 
       // Make the request with Dio
       final response = await dio.post(
-        'https://medicareplus-api.vercel.app/api/admin/update_request_form',
+        adminEndpoint('update_request_form'),
         data: formData,
         options: Options(
-          headers: {
-            'supabase-url': supabaseUrl,
-            'supabase-key': supabaseKey,
-          },
+          headers: buildApiHeaders(includeContentType: false),
           sendTimeout: const Duration(seconds: 10),
           receiveTimeout: const Duration(seconds: 10),
         ),
@@ -419,21 +395,23 @@ Future<bool> _releasedRequest(String lockedBy, String requestId) async {
 
         if (response.statusCode == 403) {
           // Handle locked request
-          await logUserAction(userId, 'mp_form_request_table', 'Update', 'Error $requestId');
+          await logUserAction(
+              userId, 'mp_form_request_table', 'Update', 'Error $requestId');
           print('Update failed: ${data['error']}');
           // Show a message to the user about the locked request
           setState(() {
             message = data['error'] ?? 'Request is locked';
           });
         } else {
-          await logUserAction(userId, 'mp_form_request_table', 'Update', 'Error $requestId');
+          await logUserAction(
+              userId, 'mp_form_request_table', 'Update', 'Error $requestId');
           print('Update failed: ${response.statusCode}');
         }
         return false;
       }
     } on DioException catch (e) {
       // Handle Dio-specific errors
-      if (e.type == DioExceptionType.connectionTimeout || 
+      if (e.type == DioExceptionType.connectionTimeout ||
           e.type == DioExceptionType.receiveTimeout ||
           e.type == DioExceptionType.sendTimeout) {
         // Handle timeout
@@ -447,12 +425,14 @@ Future<bool> _releasedRequest(String lockedBy, String requestId) async {
         // Handle HTTP error responses
         final data = e.response?.data;
         if (e.response?.statusCode == 403) {
-          await logUserAction(userId, 'mp_form_request_table', 'Update', 'Error $requestId');
+          await logUserAction(
+              userId, 'mp_form_request_table', 'Update', 'Error $requestId');
           setState(() {
             message = data?['error'] ?? 'Request is locked';
           });
         } else {
-          await logUserAction(userId, 'mp_form_request_table', 'Update', 'Error $requestId');
+          await logUserAction(
+              userId, 'mp_form_request_table', 'Update', 'Error $requestId');
           print('Update failed: ${e.response?.statusCode}');
         }
         return false;
@@ -627,7 +607,7 @@ Future<bool> _releasedRequest(String lockedBy, String requestId) async {
               builder: (context, snapshot) {
                 if (snapshot.connectionState == ConnectionState.waiting) {
                   return const Center(
-              // Center the spinner when loading
+                    // Center the spinner when loading
                     child: SpinKitCircle(
                       color: Color(0xff13322B), // Change the color as needed
                       size: 50.0, // Adjust size as needed
@@ -638,8 +618,9 @@ Future<bool> _releasedRequest(String lockedBy, String requestId) async {
                 if (snapshot.hasError) {
                   return Center(child: Text('Error: ${snapshot.error}'));
                 }
-                requests = snapshot.data ?? []; // Use the data from the snapshot
-                  
+                requests =
+                    snapshot.data ?? []; // Use the data from the snapshot
+
                 filteredRequest = requests;
 
                 filteredRequest = statusFilter.isEmpty
@@ -648,8 +629,9 @@ Future<bool> _releasedRequest(String lockedBy, String requestId) async {
                         .where((request) => request['status'] == statusFilter)
                         .toList();
 
-                  if(filterCriteria==''){
-                    filteredRequest = filteredRequest;/*.where((request) {
+                if (filterCriteria == '') {
+                  filteredRequest =
+                      filteredRequest; /*.where((request) {
                     final otherField1 = request['patient_fname']?.toLowerCase() ?? '';
                     final otherField2 = request['patient_lname']?.toLowerCase() ?? '';
                     final otherField3 = request['request_id']?.toString().toLowerCase() ?? '';
@@ -663,35 +645,40 @@ Future<bool> _releasedRequest(String lockedBy, String requestId) async {
                         otherField4.contains(searchQuery) ||
                         email.contains(searchQuery);
                   }).toList();*/
-                  }else{
-                    
-                    filteredRequest = filteredRequest.where((request) {
-                      if (filterCriteria == 'member') {
-                        // Filter by first name or last name
-                        final firstName = request['patient_fname']?.toLowerCase() ?? '';
-                        final lastName = request['patient_lname']?.toLowerCase() ?? '';
-                        return firstName.contains(searchQuery) || lastName.contains(searchQuery);
-                      }else if(filterCriteria == 'loa_no'){
-                        final loa = request['request_id']?.toString().toLowerCase() ?? '';
-                        return loa.contains(searchQuery);
-                      }else if(filterCriteria == 'email'){
-                        final email = request['patient_email']?.toLowerCase() ?? '';
-                        return email.contains(searchQuery);
-                      }else if(filterCriteria == 'date'){
-                        String dateCreatedString = request['date_created'];
-                        DateTime dateCreated = DateTime.parse(dateCreatedString);
-                        formattedDate = formatDate(dateCreated);
-                        final dateRequest = formattedDate.toLowerCase() ?? '';
-                        return dateRequest.contains(searchQuery);
-                      }else if(filterCriteria == 'request_type'){
-                        final requestType = request['form_type']?.toLowerCase() ?? '';
-                        return requestType.contains(searchQuery);
-                      }else{
-                        return false;
-                      }
-                    }).toList();
-                  }
-                
+                } else {
+                  filteredRequest = filteredRequest.where((request) {
+                    if (filterCriteria == 'member') {
+                      // Filter by first name or last name
+                      final firstName =
+                          request['patient_fname']?.toLowerCase() ?? '';
+                      final lastName =
+                          request['patient_lname']?.toLowerCase() ?? '';
+                      return firstName.contains(searchQuery) ||
+                          lastName.contains(searchQuery);
+                    } else if (filterCriteria == 'loa_no') {
+                      final loa =
+                          request['request_id']?.toString().toLowerCase() ?? '';
+                      return loa.contains(searchQuery);
+                    } else if (filterCriteria == 'email') {
+                      final email =
+                          request['patient_email']?.toLowerCase() ?? '';
+                      return email.contains(searchQuery);
+                    } else if (filterCriteria == 'date') {
+                      String dateCreatedString = request['date_created'];
+                      DateTime dateCreated = DateTime.parse(dateCreatedString);
+                      formattedDate = formatDate(dateCreated);
+                      final dateRequest = formattedDate.toLowerCase() ?? '';
+                      return dateRequest.contains(searchQuery);
+                    } else if (filterCriteria == 'request_type') {
+                      final requestType =
+                          request['form_type']?.toLowerCase() ?? '';
+                      return requestType.contains(searchQuery);
+                    } else {
+                      return false;
+                    }
+                  }).toList();
+                }
+
                 countStatuses(requests);
 
                 return Padding(
@@ -779,14 +766,16 @@ Future<bool> _releasedRequest(String lockedBy, String requestId) async {
                                         readOnly: filterCriteria.isEmpty,
                                         decoration: InputDecoration(
                                           border: OutlineInputBorder(
-                                            borderRadius: BorderRadius.circular(10),
+                                            borderRadius:
+                                                BorderRadius.circular(10),
                                             borderSide: const BorderSide(
                                               color: Colors
                                                   .black, // Set the outline color to black
                                             ),
                                           ),
                                           focusedBorder: OutlineInputBorder(
-                                            borderRadius: BorderRadius.circular(10),
+                                            borderRadius:
+                                                BorderRadius.circular(10),
                                             borderSide: const BorderSide(
                                               color: Color.fromARGB(255, 0, 0,
                                                   0), // Outline color changes to green when focused
@@ -797,12 +786,14 @@ Future<bool> _releasedRequest(String lockedBy, String requestId) async {
                                             color: Colors
                                                 .black, // Set search icon color to black
                                           ),
-                                          contentPadding: const EdgeInsets.symmetric(
-                                              vertical: 8), // Align text
+                                          contentPadding:
+                                              const EdgeInsets.symmetric(
+                                                  vertical: 8), // Align text
                                         ),
                                         style: const TextStyle(
                                           fontSize: 12, // Set smaller font size
-                                          color: Colors.black, // Set text color to black
+                                          color: Colors
+                                              .black, // Set text color to black
                                         ),
                                         onChanged: _onSearchChanged,
                                       ),
@@ -1066,7 +1057,8 @@ Future<bool> _releasedRequest(String lockedBy, String requestId) async {
                                   child: Container(
                                     height: 120,
                                     decoration: BoxDecoration(
-                                      color: const Color(0xffD8DEE1), // Set background color
+                                      color: const Color(
+                                          0xffD8DEE1), // Set background color
                                       border: Border.all(
                                         color: activeButtonIndex == 3
                                             ? Colors.black
@@ -1138,19 +1130,25 @@ Future<bool> _releasedRequest(String lockedBy, String requestId) async {
                                     onTap: () {
                                       setState(() {
                                         if (filterCriteria == 'loa_no') {
-                                          filterCriteria = ''; // Clear the filterCriteria (or set to null)
-                                          searchQuery = ''; // Optionally reset the search query
-                                          searchController.text='';
+                                          filterCriteria =
+                                              ''; // Clear the filterCriteria (or set to null)
+                                          searchQuery =
+                                              ''; // Optionally reset the search query
+                                          searchController.text = '';
                                         } else {
-                                          filterCriteria = 'loa_no'; // Set to 'member' if it's not already
-                                          searchQuery = ''; // Optionally reset the search query
-                                          searchController.text='';
+                                          filterCriteria =
+                                              'loa_no'; // Set to 'member' if it's not already
+                                          searchQuery =
+                                              ''; // Optionally reset the search query
+                                          searchController.text = '';
                                         }
                                       });
                                     },
                                     child: Container(
                                       decoration: BoxDecoration(
-                                        color: filterCriteria=='loa_no'?const Color(0xFF13322B):Colors.transparent,
+                                        color: filterCriteria == 'loa_no'
+                                            ? const Color(0xFF13322B)
+                                            : Colors.transparent,
                                         border: Border.all(
                                           color: Colors
                                               .black, // Outline color for the text container
@@ -1170,7 +1168,9 @@ Future<bool> _releasedRequest(String lockedBy, String requestId) async {
                                         'LOA Number',
                                         style: TextStyle(
                                             fontWeight: FontWeight.bold,
-                                            color: filterCriteria=='loa_no'?const Color(0xFFFFFFFF):Colors.black),
+                                            color: filterCriteria == 'loa_no'
+                                                ? const Color(0xFFFFFFFF)
+                                                : Colors.black),
                                       ),
                                     ),
                                   ),
@@ -1183,19 +1183,25 @@ Future<bool> _releasedRequest(String lockedBy, String requestId) async {
                                     onTap: () {
                                       setState(() {
                                         if (filterCriteria == 'member') {
-                                          filterCriteria = ''; // Clear the filterCriteria (or set to null)
-                                          searchQuery = ''; // Optionally reset the search query
-                                          searchController.text='';
+                                          filterCriteria =
+                                              ''; // Clear the filterCriteria (or set to null)
+                                          searchQuery =
+                                              ''; // Optionally reset the search query
+                                          searchController.text = '';
                                         } else {
-                                          filterCriteria = 'member'; // Set to 'member' if it's not already
-                                          searchQuery = ''; // Optionally reset the search query
-                                          searchController.text='';
+                                          filterCriteria =
+                                              'member'; // Set to 'member' if it's not already
+                                          searchQuery =
+                                              ''; // Optionally reset the search query
+                                          searchController.text = '';
                                         }
                                       });
                                     },
                                     child: Container(
                                       decoration: BoxDecoration(
-                                        color: filterCriteria=='member'?const Color(0xFF13322B):Colors.transparent,
+                                        color: filterCriteria == 'member'
+                                            ? const Color(0xFF13322B)
+                                            : Colors.transparent,
                                         border: Border.all(
                                           color: Colors
                                               .black, // Outline color for the text container
@@ -1209,7 +1215,9 @@ Future<bool> _releasedRequest(String lockedBy, String requestId) async {
                                         'Requester Name',
                                         style: TextStyle(
                                             fontWeight: FontWeight.bold,
-                                            color: filterCriteria=='member'?const Color(0xFFFFFFFF):Colors.black),
+                                            color: filterCriteria == 'member'
+                                                ? const Color(0xFFFFFFFF)
+                                                : Colors.black),
                                       ),
                                     ),
                                   ),
@@ -1221,19 +1229,25 @@ Future<bool> _releasedRequest(String lockedBy, String requestId) async {
                                     onTap: () {
                                       setState(() {
                                         if (filterCriteria == 'email') {
-                                          filterCriteria = ''; // Clear the filterCriteria (or set to null)
-                                          searchQuery = ''; // Optionally reset the search query
-                                          searchController.text='';
+                                          filterCriteria =
+                                              ''; // Clear the filterCriteria (or set to null)
+                                          searchQuery =
+                                              ''; // Optionally reset the search query
+                                          searchController.text = '';
                                         } else {
-                                          filterCriteria = 'email'; // Set to 'member' if it's not already
-                                          searchQuery = ''; // Optionally reset the search query
-                                          searchController.text='';
+                                          filterCriteria =
+                                              'email'; // Set to 'member' if it's not already
+                                          searchQuery =
+                                              ''; // Optionally reset the search query
+                                          searchController.text = '';
                                         }
                                       });
                                     },
                                     child: Container(
                                       decoration: BoxDecoration(
-                                        color: filterCriteria=='email'?const Color(0xFF13322B):Colors.transparent,
+                                        color: filterCriteria == 'email'
+                                            ? const Color(0xFF13322B)
+                                            : Colors.transparent,
                                         border: Border.all(
                                           color: Colors.black,
                                           width: 1.0,
@@ -1244,7 +1258,9 @@ Future<bool> _releasedRequest(String lockedBy, String requestId) async {
                                         'Email',
                                         style: TextStyle(
                                             fontWeight: FontWeight.bold,
-                                            color: filterCriteria=='email'?const Color(0xFFFFFFFF): Colors.black),
+                                            color: filterCriteria == 'email'
+                                                ? const Color(0xFFFFFFFF)
+                                                : Colors.black),
                                       ),
                                     ),
                                   ),
@@ -1256,19 +1272,25 @@ Future<bool> _releasedRequest(String lockedBy, String requestId) async {
                                     onTap: () {
                                       setState(() {
                                         if (filterCriteria == 'date') {
-                                          filterCriteria = ''; // Clear the filterCriteria (or set to null)
-                                          searchQuery = ''; // Optionally reset the search query
-                                          searchController.text='';
+                                          filterCriteria =
+                                              ''; // Clear the filterCriteria (or set to null)
+                                          searchQuery =
+                                              ''; // Optionally reset the search query
+                                          searchController.text = '';
                                         } else {
-                                          filterCriteria = 'date'; // Set to 'member' if it's not already
-                                          searchQuery = ''; // Optionally reset the search query
-                                          searchController.text='';
+                                          filterCriteria =
+                                              'date'; // Set to 'member' if it's not already
+                                          searchQuery =
+                                              ''; // Optionally reset the search query
+                                          searchController.text = '';
                                         }
                                       });
                                     },
                                     child: Container(
                                       decoration: BoxDecoration(
-                                        color: filterCriteria=='date'?const Color(0xFF13322B):Colors.transparent,
+                                        color: filterCriteria == 'date'
+                                            ? const Color(0xFF13322B)
+                                            : Colors.transparent,
                                         border: Border.all(
                                           color: Colors.black,
                                           width: 1.0,
@@ -1279,7 +1301,9 @@ Future<bool> _releasedRequest(String lockedBy, String requestId) async {
                                         'Date and Time',
                                         style: TextStyle(
                                             fontWeight: FontWeight.bold,
-                                            color: filterCriteria=='date'?const Color(0xFFFFFFFF):Colors.black),
+                                            color: filterCriteria == 'date'
+                                                ? const Color(0xFFFFFFFF)
+                                                : Colors.black),
                                       ),
                                     ),
                                   ),
@@ -1291,19 +1315,25 @@ Future<bool> _releasedRequest(String lockedBy, String requestId) async {
                                     onTap: () {
                                       setState(() {
                                         if (filterCriteria == 'request_type') {
-                                          filterCriteria = ''; // Clear the filterCriteria (or set to null)
-                                          searchQuery = ''; // Optionally reset the search query
-                                          searchController.text='';
+                                          filterCriteria =
+                                              ''; // Clear the filterCriteria (or set to null)
+                                          searchQuery =
+                                              ''; // Optionally reset the search query
+                                          searchController.text = '';
                                         } else {
-                                          filterCriteria = 'request_type'; // Set to 'member' if it's not already
-                                          searchQuery = ''; // Optionally reset the search query
-                                          searchController.text='';
+                                          filterCriteria =
+                                              'request_type'; // Set to 'member' if it's not already
+                                          searchQuery =
+                                              ''; // Optionally reset the search query
+                                          searchController.text = '';
                                         }
                                       });
                                     },
                                     child: Container(
                                       decoration: BoxDecoration(
-                                        color: filterCriteria=='request_type'?const Color(0xFF13322B):Colors.transparent,
+                                        color: filterCriteria == 'request_type'
+                                            ? const Color(0xFF13322B)
+                                            : Colors.transparent,
                                         border: Border.all(
                                           color: Colors.black,
                                           width: 1.0,
@@ -1314,7 +1344,10 @@ Future<bool> _releasedRequest(String lockedBy, String requestId) async {
                                         'Service Type',
                                         style: TextStyle(
                                             fontWeight: FontWeight.bold,
-                                            color: filterCriteria=='request_type'?const Color(0xFFFFFFFF):Colors.black),
+                                            color:
+                                                filterCriteria == 'request_type'
+                                                    ? const Color(0xFFFFFFFF)
+                                                    : Colors.black),
                                       ),
                                     ),
                                   ),
@@ -1457,14 +1490,17 @@ Future<bool> _releasedRequest(String lockedBy, String requestId) async {
                                                               'rejected'
                                                           ? const Color(
                                                               0xfff0516e)
-                                                          : const Color(0xffD8DEE1), // Default color if needed
+                                                          : const Color(
+                                                              0xffD8DEE1), // Default color if needed
                                               borderRadius:
                                                   BorderRadius.circular(20),
                                             ),
                                             padding: const EdgeInsets.all(8.0),
                                             child: Center(
                                               child: Text(
-                                                request['status'].toUpperCase() ?? '',
+                                                request['status']
+                                                        .toUpperCase() ??
+                                                    '',
                                                 style: const TextStyle(
                                                   fontSize: 16,
                                                   color: Colors
@@ -1477,22 +1513,25 @@ Future<bool> _releasedRequest(String lockedBy, String requestId) async {
 // Action
                                         Expanded(
                                           child: Padding(
-                                            padding: EdgeInsets.only(left: request['locked_by'] != null?0:50),
+                                            padding: EdgeInsets.only(
+                                                left:
+                                                    request['locked_by'] != null
+                                                        ? 0
+                                                        : 50),
                                             child: Row(
                                               mainAxisAlignment:
-                                                  MainAxisAlignment
-                                                      .end,
+                                                  MainAxisAlignment.end,
                                               children: [
                                                 BlocBuilder<AuthBloc,
                                                     AuthState>(
                                                   builder: (context, state) {
                                                     if (state is AuthSuccess) {
-                                                       
-                                                        return Row(
-                                                          children: [
+                                                      return Row(
+                                                        children: [
                                                           if (state.adminType ==
-                                                          'admin' || state.adminType ==
-                                                          'concierge')
+                                                                  'admin' ||
+                                                              state.adminType ==
+                                                                  'concierge')
                                                             IconButton(
                                                               icon: const Icon(
                                                                   Icons.check),
@@ -1500,46 +1539,63 @@ Future<bool> _releasedRequest(String lockedBy, String requestId) async {
                                                                               'status'] ==
                                                                           'approved' ||
                                                                       request['status'] ==
-                                                                          'rejected' || request['status']=='cancelled'
+                                                                          'rejected' ||
+                                                                      request['status'] ==
+                                                                          'cancelled'
                                                                   ? null // Disable if status is approved or rejected
                                                                   : () async {
                                                                       // Show green modal when check icon is clicked
-                                                                      bool isStated =await _releasedRequest(authState.uid.toString() ,request['request_id'].toString());
-                                                                      if(isStated){
-                                                                        String lockedId = await _lockedRequest(authState.uid.toString(), request['request_id'].toString());
-                                                                        String userName = await _getName(lockedId);
-                                                                        if(lockedId==authState.uid.toString()){
+                                                                      bool isStated = await _releasedRequest(
+                                                                          authState
+                                                                              .uid
+                                                                              .toString(),
+                                                                          request['request_id']
+                                                                              .toString());
+                                                                      if (isStated) {
+                                                                        String lockedId = await _lockedRequest(
+                                                                            authState.uid.toString(),
+                                                                            request['request_id'].toString());
+                                                                        String
+                                                                            userName =
+                                                                            await _getName(lockedId);
+                                                                        if (lockedId ==
+                                                                            authState.uid.toString()) {
                                                                           showApprovalDialog(
-                                                                            context,
-                                                                            request,
-                                                                            setState,
-                                                                            authState
-                                                                                .uid
-                                                                                .toString());
-                                                                        }else{
-                                                                        _showMessage('Request is currently being processed by $userName','Error');
+                                                                              context,
+                                                                              request,
+                                                                              setState,
+                                                                              authState.uid.toString());
+                                                                        } else {
+                                                                          _showMessage(
+                                                                              'Request is currently being processed by $userName',
+                                                                              'Error');
                                                                         }
-                                                                      }else{
-                                                                        String lockedId = await _lockedRequest(authState.uid.toString(), request['request_id'].toString());
-                                                                        String userName = await _getName(lockedId);
-                                                                        if(lockedId==authState.uid.toString()){
+                                                                      } else {
+                                                                        String lockedId = await _lockedRequest(
+                                                                            authState.uid.toString(),
+                                                                            request['request_id'].toString());
+                                                                        String
+                                                                            userName =
+                                                                            await _getName(lockedId);
+                                                                        if (lockedId ==
+                                                                            authState.uid.toString()) {
                                                                           showApprovalDialog(
-                                                                            context,
-                                                                            request,
-                                                                            setState,
-                                                                            authState
-                                                                                .uid
-                                                                                .toString());
-                                                                        }else{
-                                                                        _showMessage('Request is currently being processed by $userName','Error');
+                                                                              context,
+                                                                              request,
+                                                                              setState,
+                                                                              authState.uid.toString());
+                                                                        } else {
+                                                                          _showMessage(
+                                                                              'Request is currently being processed by $userName',
+                                                                              'Error');
+                                                                        }
                                                                       }
-                                                                      }
-                                                                      
                                                                     },
                                                             ),
-                                                            if (state.adminType ==
-                                                          'admin' || state.adminType ==
-                                                          'concierge')
+                                                          if (state.adminType ==
+                                                                  'admin' ||
+                                                              state.adminType ==
+                                                                  'concierge')
                                                             IconButton(
                                                               icon: const Icon(
                                                                   Icons.close),
@@ -1547,49 +1603,66 @@ Future<bool> _releasedRequest(String lockedBy, String requestId) async {
                                                                               'status'] ==
                                                                           'approved' ||
                                                                       request['status'] ==
-                                                                          'rejected' || request['status']=='cancelled'
+                                                                          'rejected' ||
+                                                                      request['status'] ==
+                                                                          'cancelled'
                                                                   ? null // Disable if status is approved or rejected
-                                                                  : () async{ 
-                                                                    print(request['locked_by']);
-                                                                      bool isStated =await _releasedRequest(authState.uid.toString() ,request['request_id'].toString());
-                                                                      if(isStated){
-                                                                        String lockedId = await _lockedRequest(authState.uid.toString(), request['request_id'].toString());
-                                                                        String userName = await _getName(lockedId);
-                                                                        if(lockedId==authState.uid.toString()){
-                                                                          showRejectDialog(context,
+                                                                  : () async {
+                                                                      print(request[
+                                                                          'locked_by']);
+                                                                      bool isStated = await _releasedRequest(
+                                                                          authState
+                                                                              .uid
+                                                                              .toString(),
+                                                                          request['request_id']
+                                                                              .toString());
+                                                                      if (isStated) {
+                                                                        String lockedId = await _lockedRequest(
+                                                                            authState.uid.toString(),
+                                                                            request['request_id'].toString());
+                                                                        String
+                                                                            userName =
+                                                                            await _getName(lockedId);
+                                                                        if (lockedId ==
+                                                                            authState.uid.toString()) {
+                                                                          showRejectDialog(
+                                                                              context,
                                                                               request,
                                                                               setState,
-                                                                              authState
-                                                                                  .uid
-                                                                                  .toString());
-                                                                        
-                                                                        }else{
-                                                                        _showMessage('Request is currently being processed by $userName','Error');
+                                                                              authState.uid.toString());
+                                                                        } else {
+                                                                          _showMessage(
+                                                                              'Request is currently being processed by $userName',
+                                                                              'Error');
                                                                         }
-                                                                      
-                                                                      }else
-                                                                      {
-                                                                        String lockedId = await _lockedRequest(authState.uid.toString(), request['request_id'].toString());
-                                                                        String userName = await _getName(lockedId);
-                                                                        if(lockedId==authState.uid.toString()){
-                                                                          showRejectDialog(context,
+                                                                      } else {
+                                                                        String lockedId = await _lockedRequest(
+                                                                            authState.uid.toString(),
+                                                                            request['request_id'].toString());
+                                                                        String
+                                                                            userName =
+                                                                            await _getName(lockedId);
+                                                                        if (lockedId ==
+                                                                            authState.uid.toString()) {
+                                                                          showRejectDialog(
+                                                                              context,
                                                                               request,
                                                                               setState,
-                                                                              authState
-                                                                                  .uid
-                                                                                  .toString());
-                                                                        
-                                                                        }else{
-                                                                        _showMessage('Request is currently being processed by $userName','Error');
+                                                                              authState.uid.toString());
+                                                                        } else {
+                                                                          _showMessage(
+                                                                              'Request is currently being processed by $userName',
+                                                                              'Error');
                                                                         }
                                                                       }
-                                                                      
                                                                     },
                                                             ),
-                                                            if (state.adminType ==
-                                                          'admin' || state.adminType ==
-                                                          'concierge' || state.adminType ==
-                                                          'claims')
+                                                          if (state.adminType ==
+                                                                  'admin' ||
+                                                              state.adminType ==
+                                                                  'concierge' ||
+                                                              state.adminType ==
+                                                                  'claims')
                                                             IconButton(
                                                               icon: const Icon(Icons
                                                                   .remove_red_eye_outlined),
@@ -1621,85 +1694,135 @@ Future<bool> _releasedRequest(String lockedBy, String requestId) async {
                                                                           name);
                                                                     },
                                                             ),
-
-                                                            if(request['locked_by']==authState.uid)
-                                                              IconButton(
-                                                                icon: const Icon(Icons.lock), // Three-dot icon
-                                                                onPressed: ()async {
-                                                                 bool isStated= await _releasedRequest(authState.uid.toString() ,request['request_id'].toString());
-                                                                 if(isStated){
-                                                                  _showMessage('LOA is now unlocked', 'Unlocked Successfully');
-                                                                 }
-                                                                }
-                                                              ),
-                                                          ],
-                                                        );
-                                                      
+                                                          if (request[
+                                                                  'locked_by'] ==
+                                                              authState.uid)
+                                                            IconButton(
+                                                                icon: const Icon(
+                                                                    Icons
+                                                                        .lock), // Three-dot icon
+                                                                onPressed:
+                                                                    () async {
+                                                                  bool isStated = await _releasedRequest(
+                                                                      authState
+                                                                          .uid
+                                                                          .toString(),
+                                                                      request['request_id']
+                                                                          .toString());
+                                                                  if (isStated) {
+                                                                    _showMessage(
+                                                                        'LOA is now unlocked',
+                                                                        'Unlocked Successfully');
+                                                                  }
+                                                                }),
+                                                        ],
+                                                      );
                                                     }
                                                     return const SizedBox
                                                         .shrink();
                                                   },
                                                 ),
-                                                
                                                 IconButton(
                                                   icon: const Icon(Icons
                                                       .more_vert), // Three-dot icon
                                                   onPressed: () {
                                                     // Show the modal when the three-dot icon is clicked
-                                                    String patientName="${request['patient_fname']} ${request['patient_lname']}";
-                                                    String cardNo=request['card_number'] ?? 'N/A';
-                                                    String serviceType=request['form_type'];
-                                                    String doctorName='N/A';
+                                                    String patientName =
+                                                        "${request['patient_fname']} ${request['patient_lname']}";
+                                                    String cardNo = request[
+                                                            'card_number'] ??
+                                                        'N/A';
+                                                    String serviceType =
+                                                        request['form_type'];
+                                                    String doctorName = 'N/A';
                                                     String notesValue = '';
-                                                    if(request['doctor_fname']!=null && request['doctor_lname']!=null){
-                                                      doctorName='${request['doctor_fname']} ${request['doctor_lname']}';
-                                                      if(request['remarks']!=null){
-                                                        String remarks = request['remarks'];
-                                                        if (remarks.isNotEmpty) {
-                                                            // Split the remarks by commas
-                                                            List<String> parts = remarks.split(',');
+                                                    String hospitalName = (request['hospital_name'] != null &&
+                                                            request['hospital_name']
+                                                                .toString()
+                                                                .isNotEmpty)
+                                                        ? request['hospital_name']
+                                                            .toString()
+                                                        : '';
+                                                    String specializationName =
+                                                        (request['specialization'] !=
+                                                                    null &&
+                                                                request['specialization']
+                                                                    .toString()
+                                                                    .isNotEmpty)
+                                                            ? request['specialization']
+                                                                .toString()
+                                                            : '';
+                                                    if (request['remarks'] !=
+                                                        null) {
+                                                      String remarks =
+                                                          request['remarks'];
+                                                      if (remarks.isNotEmpty) {
+                                                        // Split the remarks by commas
+                                                        List<String> parts =
+                                                            remarks.split(',');
 
-                                                            // Loop through each part to find the doctor and notes values
-                                                            for (String part in parts) {
-                                                              if (part.startsWith('doctor:')) {
-                                                                // Get the value after 'doctor:'
-                                                                //doctorName = part.split(':')[1]; // This will give you the doctor value
-                                                              } else if (part.startsWith('notes:')) {
-                                                                // Get the value after 'notes:'
-                                                                notesValue = part.split(':')[1]; // This will give you the notes value
-                                                                if(notesValue.isEmpty){
-                                                                  notesValue='N/A';
-                                                                }
-                                                              }
+                                                        // Loop through each part to find hospital, specialization, doctor and notes values
+                                                        for (String part
+                                                            in parts) {
+                                                          if (part.startsWith(
+                                                              'hospital:')) {
+                                                            String value = part
+                                                                .split(':')[1]
+                                                                .trim();
+                                                            if (value
+                                                                .isNotEmpty) {
+                                                              hospitalName =
+                                                                  value;
                                                             }
-                                                          }
-                                                        }else{
-                                                          notesValue='N/A';
-                                                        }
-                                                    }else{
-                                                      if(request['remarks']!=null){
-                                                        String remarks = request['remarks'];
-                                                        if (remarks.isNotEmpty) {
-                                                            // Split the remarks by commas
-                                                            List<String> parts = remarks.split(',');
-
-                                                            // Loop through each part to find the doctor and notes values
-                                                            for (String part in parts) {
-                                                              if (part.startsWith('doctor:')) {
-                                                                // Get the value after 'doctor:'
-                                                                doctorName = part.split(':')[1]; // This will give you the doctor value
-                                                              } else if (part.startsWith('notes:')) {
-                                                                // Get the value after 'notes:'
-                                                                notesValue = part.split(':')[1]; // This will give you the notes value
-                                                                if(notesValue.isEmpty){
-                                                                  notesValue='N/A';
-                                                                }
-                                                              }
+                                                          } else if (part
+                                                              .startsWith(
+                                                                  'specialization:')) {
+                                                            String value = part
+                                                                .split(':')[1]
+                                                                .trim();
+                                                            if (value
+                                                                .isNotEmpty) {
+                                                              specializationName =
+                                                                  value;
                                                             }
+                                                          } else if (part
+                                                              .startsWith(
+                                                                  'doctor:')) {
+                                                            String value = part
+                                                                .split(':')[1]
+                                                                .trim();
+                                                            if (value
+                                                                .isNotEmpty) {
+                                                              doctorName =
+                                                                  value;
+                                                            }
+                                                          } else if (part
+                                                              .startsWith(
+                                                                  'notes:')) {
+                                                            notesValue = part
+                                                                    .split(
+                                                                        ':')[1]
+                                                                .trim();
                                                           }
-                                                        }else{
-                                                          notesValue='N/A';
                                                         }
+                                                      }
+                                                    }
+                                                    if (notesValue.isEmpty) {
+                                                      notesValue = 'N/A';
+                                                    }
+                                                    if (hospitalName.isEmpty) {
+                                                      hospitalName = 'N/A';
+                                                    }
+                                                    if (specializationName
+                                                        .isEmpty) {
+                                                      specializationName = 'N/A';
+                                                    }
+                                                    if (request['doctor_fname'] !=
+                                                            null &&
+                                                        request['doctor_lname'] !=
+                                                            null) {
+                                                      doctorName =
+                                                          '${request['doctor_fname']} ${request['doctor_lname']}';
                                                     }
                                                     showDialog(
                                                       context: context,
@@ -1755,22 +1878,18 @@ Future<bool> _releasedRequest(String lockedBy, String requestId) async {
                                                                               bottom: BorderSide(color: Colors.grey), // Bottom border line
                                                                             ),
                                                                             children: [
-                                                                              
                                                                               TableRow(children: [
                                                                                 const Text("Patient Name", style: TextStyle(color: Colors.black)),
                                                                                 Text(patientName ?? 'N/A', style: const TextStyle(color: Colors.black)),
                                                                               ]),
-
                                                                               TableRow(children: [
                                                                                 const Text("Contact No", style: TextStyle(color: Colors.black)),
                                                                                 Text(request['patient_contact'] ?? 'N/A', style: const TextStyle(color: Colors.black)),
                                                                               ]),
-                                                                              
                                                                               TableRow(children: [
                                                                                 const Text("Card Number", style: TextStyle(color: Colors.black)),
-                                                                                Text(cardNo?? 'N/A', style: const TextStyle(color: Colors.black)),
+                                                                                Text(cardNo ?? 'N/A', style: const TextStyle(color: Colors.black)),
                                                                               ]),
-                                                                              
                                                                               TableRow(children: [
                                                                                 const Text("Service Type", style: TextStyle(color: Colors.black)),
                                                                                 Text(serviceType ?? 'N/A', style: const TextStyle(color: Colors.black)),
@@ -1781,11 +1900,11 @@ Future<bool> _releasedRequest(String lockedBy, String requestId) async {
                                                                               ]),
                                                                               TableRow(children: [
                                                                                 const Text("Hospital", style: TextStyle(color: Colors.black)),
-                                                                                Text(request['hospital_name'] ?? 'N/A', style: const TextStyle(color: Colors.black)),
+                                                                                Text(hospitalName, style: const TextStyle(color: Colors.black)),
                                                                               ]),
                                                                               TableRow(children: [
                                                                                 const Text("Specialization", style: TextStyle(color: Colors.black)),
-                                                                                Text(request['specialization'] ?? 'N/A', style: const TextStyle(color: Colors.black)),
+                                                                                Text(specializationName, style: const TextStyle(color: Colors.black)),
                                                                               ]),
                                                                               TableRow(children: [
                                                                                 const Text("Doctor Name", style: TextStyle(color: Colors.black)),
@@ -1805,34 +1924,33 @@ Future<bool> _releasedRequest(String lockedBy, String requestId) async {
                                                                               ]),
                                                                             ],
                                                                           ),
-                                                                          if(request['cancelled_remarks']!=null)
-                                                                             Column(
+                                                                          if (request['cancelled_remarks'] !=
+                                                                              null)
+                                                                            Column(
                                                                               children: [
                                                                                 const SizedBox(height: 30),
-                                                                                 SizedBox(
+                                                                                SizedBox(
                                                                                   width: 600,
                                                                                   child: Column(
                                                                                     crossAxisAlignment: CrossAxisAlignment.start,
                                                                                     children: [
                                                                                       const Text('Reason for Cancellation',
-                                                                                      style:
-                                                                                          TextStyle(
-                                                                                        fontWeight: FontWeight.bold,
-                                                                                        fontSize: 16,
-                                                                                        color: Colors.black,
-                                                                                      )),
-                                                                                      const Divider(color: Color(0xFF000000),
-                                                                                      thickness: .3,
-                                                                                      indent: 0,
-                                                                                      endIndent: 0),
+                                                                                          style: TextStyle(
+                                                                                            fontWeight: FontWeight.bold,
+                                                                                            fontSize: 16,
+                                                                                            color: Colors.black,
+                                                                                          )),
+                                                                                      const Divider(color: Color(0xFF000000), thickness: .3, indent: 0, endIndent: 0),
                                                                                       const SizedBox(height: 5),
-                                                                                      Text(request['cancelled_remarks'],
-                                                                                      style:const TextStyle(
-                                                                                        fontSize: 14,
-                                                                                        color: Colors.black,
-                                                                                      ),
-                                                                                      softWrap: true, // Ensures that the text will wrap if needed
-                                                                                      maxLines: 3,)
+                                                                                      Text(
+                                                                                        request['cancelled_remarks'],
+                                                                                        style: const TextStyle(
+                                                                                          fontSize: 14,
+                                                                                          color: Colors.black,
+                                                                                        ),
+                                                                                        softWrap: true, // Ensures that the text will wrap if needed
+                                                                                        maxLines: 3,
+                                                                                      )
                                                                                     ],
                                                                                   ),
                                                                                 ),
@@ -1892,9 +2010,9 @@ Future<bool> _releasedRequest(String lockedBy, String requestId) async {
     );
   }
 
-
-  void showRejectDialog(BuildContext context, final request, StateSetter setState, String uid){
-    bool isLoading =false;
+  void showRejectDialog(
+      BuildContext context, final request, StateSetter setState, String uid) {
+    bool isLoading = false;
     showDialog(
       context: context,
       barrierDismissible: false,
@@ -1996,15 +2114,17 @@ Future<bool> _releasedRequest(String lockedBy, String requestId) async {
                             rejectionReason,
                           );
 
-                          
-
                           setState(() {
                             isLoading =
                                 false; // Reset loading state after the operation
                           });
 
                           if (isStated) {
-                            await logUserAction(uid,'mp_form_request_table','Update','Reject ${request['request_id'].toString()}');
+                            await logUserAction(
+                                uid,
+                                'mp_form_request_table',
+                                'Update',
+                                'Reject ${request['request_id'].toString()}');
                             // Close all dialogs and show the success message
                             Navigator.of(context).popUntil(
                                 (route) => route.isFirst); // Close all modals
@@ -2037,8 +2157,8 @@ Future<bool> _releasedRequest(String lockedBy, String requestId) async {
                   onPressed: !isLoading
                       ? () {
                           setState(() {
-                            _releasedRequest(uid,
-                                request['request_id'].toString());
+                            _releasedRequest(
+                                uid, request['request_id'].toString());
                           });
                           Navigator.of(context).pop();
                         }
@@ -2069,9 +2189,8 @@ Future<bool> _releasedRequest(String lockedBy, String requestId) async {
       context: context,
       barrierDismissible: false,
       builder: (BuildContext context) {
-        return StatefulBuilder(
-          builder: (BuildContext context, setState) {
-            return AlertDialog(
+        return StatefulBuilder(builder: (BuildContext context, setState) {
+          return AlertDialog(
             backgroundColor: const Color(0xffffffff),
             title: const Text(
               'APPROVE',
@@ -2118,8 +2237,8 @@ Future<bool> _releasedRequest(String lockedBy, String requestId) async {
                           if (_selectedFiles != null)
                             ..._selectedFiles!.map((file) => Text(
                                   file.name,
-                                  style: const TextStyle(
-                                      color: Color(0xff13322b)),
+                                  style:
+                                      const TextStyle(color: Color(0xff13322b)),
                                 )),
                         ],
                       ),
@@ -2127,51 +2246,61 @@ Future<bool> _releasedRequest(String lockedBy, String requestId) async {
             ),
             actions: [
               TextButton(
-                onPressed: !_isLoading? () async {
-                  try{
-                    if(_selectedFiles!.isEmpty && _selectedFiles==null){
-                      _showMessage('Please select a LOA file to upload', "Error: File upload is required");
-                      setState(() {
-                        _selectedFiles = null;
-                      });
-                    }else{
-                      setState(() {
-                        _isLoading = true; // Start loading
-                      });
-                      String fullName =
-                          '${request['patient_lname']}${request['patient_fname']}';
-                      bool isStated = await _updateRequestForm(
-                          request['request_id'].toString(),
-                          'approved',
-                          fullName,
-                          uid,
-                          'forms',
-                          '');
-                      setState(() {
-                        _selectedFiles = null;
-                        _isLoading = false; // Stop loading
-                      });
-                        
-                      if (isStated) {
-                        await logUserAction(uid,'mp_form_request_table','Update','Approved ${request['request_id'].toString()}');
-                        Navigator.of(context).popUntil((route) => route.isFirst);
-                        _showMessage(
-                            'LOA Request ID: ${request['request_id']} has been approved',
-                            'Approval Completed');
-                      } else {
-                        Navigator.of(context).popUntil((route) => route.isFirst);
-                        _showMessage(
-                            message.isNotEmpty
-                                ? message
-                                : 'Request is currently being processed by another user',
-                            'Error');
+                onPressed: !_isLoading
+                    ? () async {
+                        try {
+                          if (_selectedFiles!.isEmpty &&
+                              _selectedFiles == null) {
+                            _showMessage('Please select a LOA file to upload',
+                                "Error: File upload is required");
+                            setState(() {
+                              _selectedFiles = null;
+                            });
+                          } else {
+                            setState(() {
+                              _isLoading = true; // Start loading
+                            });
+                            String fullName =
+                                '${request['patient_lname']}${request['patient_fname']}';
+                            bool isStated = await _updateRequestForm(
+                                request['request_id'].toString(),
+                                'approved',
+                                fullName,
+                                uid,
+                                'forms',
+                                '');
+                            setState(() {
+                              _selectedFiles = null;
+                              _isLoading = false; // Stop loading
+                            });
+
+                            if (isStated) {
+                              await logUserAction(
+                                  uid,
+                                  'mp_form_request_table',
+                                  'Update',
+                                  'Approved ${request['request_id'].toString()}');
+                              Navigator.of(context)
+                                  .popUntil((route) => route.isFirst);
+                              _showMessage(
+                                  'LOA Request ID: ${request['request_id']} has been approved',
+                                  'Approval Completed');
+                            } else {
+                              Navigator.of(context)
+                                  .popUntil((route) => route.isFirst);
+                              _showMessage(
+                                  message.isNotEmpty
+                                      ? message
+                                      : 'Request is currently being processed by another user',
+                                  'Error');
+                            }
+                          }
+                        } catch (error) {
+                          _showMessage('Please select a LOA file to upload',
+                              "Error: File upload is required");
+                        }
                       }
-                    }
-                  }catch(error){
-                    _showMessage('Please select a LOA file to upload', "Error: File upload is required");
-                  }
-                  
-                }:null,
+                    : null,
                 style: TextButton.styleFrom(
                   backgroundColor: const Color(0xff13322b),
                   shape: RoundedRectangleBorder(
@@ -2184,13 +2313,16 @@ Future<bool> _releasedRequest(String lockedBy, String requestId) async {
                 ),
               ),
               TextButton(
-                onPressed: !_isLoading?() {
-                  Navigator.of(context).pop();
-                  setState((){
-                    _selectedFiles = null;
-                    _releasedRequest(uid ,request['request_id'].toString());
-                  });
-                }:null,
+                onPressed: !_isLoading
+                    ? () {
+                        Navigator.of(context).pop();
+                        setState(() {
+                          _selectedFiles = null;
+                          _releasedRequest(
+                              uid, request['request_id'].toString());
+                        });
+                      }
+                    : null,
                 style: TextButton.styleFrom(
                   backgroundColor: const Color(0xff13322b),
                   shape: RoundedRectangleBorder(
@@ -2204,8 +2336,7 @@ Future<bool> _releasedRequest(String lockedBy, String requestId) async {
               ),
             ],
           );
-          }
-        );
+        });
       },
     );
   }
@@ -2235,7 +2366,8 @@ Future<bool> _releasedRequest(String lockedBy, String requestId) async {
                           placeholder: (context, url) => const SizedBox(
                             width: 5.0, // Set your desired width
                             height: 30.0, // Set your desired height
-                            child: Center(child: SpinKitCircle(
+                            child: Center(
+                                child: SpinKitCircle(
                               color: Color(
                                   0xffffffff), // Change the color as needed
                               size: 50.0, // Adjust size as needed
